@@ -110,8 +110,8 @@ Centang item saat selesai diimplementasi **dan** diverifikasi.
 | [x] | M+ M− (shift + −) | MEMORY_PLUS/MINUS — `mem ±= operand` (case 48/49) | ✅ `memoryPlusMinus()` |
 | [x] | simple M+/M−/MC/MS/MR | sama dengan sci | ✅ wired |
 | [x] | Random (shift =) | CONST_RAND float [0,1) | ✅ Math.random |
-| [ ] | CONST / CONV / STATS | buka dialog | [ ] no-op |
-| [ ] | DMS shift a/b | dialog/konversi DMS | [ ] insert `°` saja |
+| [x] | CONST / CONV / STATS | buka dialog | ✅ `dialog/ConstantsDialog` + `ConversionDialog` + `StatisticsDialog` |
+| [x] | DMS shift a/b | konversi DMS `°' "` | ✅ `DmsHelper.toDms()` (fallback `°`) |
 
 ---
 
@@ -171,6 +171,8 @@ Diterapkan via `CalcTypefaceHelper.applyFontId` + `SimpleCalculatorActivity.appl
 | 2026-09-24 | Refactor | **Split file** — Activity 1520→931; baru `ExpressionEvaluator` (454), `ExpressionDecorator` (86), `CalculatorMemory` (52), `CalcTokens` (47). Smoke PASS 4/4 |
 | 2026-09-24 | Refactor | **Sub-package** — `expression/` (eval+format), `memory/`, `ui/` (widgets+font); Activity tetap root. Layout XML class refs updated. Smoke PASS 5/5 |
 | 2026-09-24 | Batch 7 | **Font per-command** — SANS1/2 MONO1 SERI1/2 via `applyKeypadFonts()`; mapping dari `keyboardFont` + `f.java`. Build OK |
+| 2026-09-24 | UI fix | **Shift label + history** — label weight dihapus, gravity bottom 11sp; ListView divider #3A3A3A 0.5dp; `CalcFontSizeHelper` expr~23/result~28sp; `=` result putih. Commit `c3c0dda` |
+| 2026-09-24 | Batch 5b | **Dialogs** — CONST/CONV/STATS (`dialog/` package) + DMS convert (`DmsHelper`). Shift 0/./±/a-b wired. 65/65 done |
 
 ---
 

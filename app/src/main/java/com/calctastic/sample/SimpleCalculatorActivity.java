@@ -15,8 +15,13 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
+import com.calctastic.sample.dialog.ConstantsDialog;
+import com.calctastic.sample.dialog.ConversionDialog;
+import com.calctastic.sample.dialog.Statistic;
+import com.calctastic.sample.dialog.StatisticsDialog;
 import com.calctastic.sample.expression.CalcSpannableFormatter;
 import com.calctastic.sample.expression.CalcTokens;
+import com.calctastic.sample.expression.DmsHelper;
 import com.calctastic.sample.expression.ExpressionDecorator;
 import com.calctastic.sample.expression.ExpressionEvaluator;
 import com.calctastic.sample.expression.NumberFormatHelper;
@@ -433,7 +438,12 @@ public class SimpleCalculatorActivity extends Activity {
                         mShiftActive = false;
                         refreshShiftLabels();
                         if (shiftPlain.isEmpty()) {
-                            // CONST / CONV / STATS — dialogs, no equation insert
+                            // CONST (shift 0) / CONV (shift .) dialogs
+                            if (buttonId == R.id.sci_0) {
+                                showConstantsDialog();
+                            } else if (buttonId == R.id.sci_dot) {
+                                showConversionDialog();
+                            }
                             return;
                         }
                         // ceil/floor/abs/arg/re/im are ordinal 68–86 → auto "("
@@ -466,9 +476,14 @@ public class SimpleCalculatorActivity extends Activity {
             insertText(" / ");
         });
 
-        // FRACTION plain="/"; shift DMS_DEGREES plain="°"
+        // FRACTION plain="/"; shift DMS — convert current number to D°M'S" (case 103)
         wireSci(R.id.sci_fraction, () -> {
-            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("°"); return; }
+            if (mShiftActive) {
+                mShiftActive = false;
+                refreshShiftLabels();
+                convertCurrentToDms();
+                return;
+            }
             insertText("/");
         });
 
@@ -578,9 +593,14 @@ public class SimpleCalculatorActivity extends Activity {
             if (consumeShift()) return;
             insertText("E");
         });
-        // NEGATE plain="-"; shift STATISTIC — dialog placeholder
+        // NEGATE plain="-"; shift STATISTIC — dialog (H(6))
         wireSci(R.id.sci_negate, () -> {
-            if (consumeShift()) return;
+            if (mShiftActive) {
+                mShiftActive = false;
+                refreshShiftLabels();
+                showStatisticsDialog();
+                return;
+            }
             insertText("-");
         });
 
@@ -782,6 +802,78 @@ public class SimpleCalculatorActivity extends Activity {
         mCursorIndex += text.length();
         evaluateLive();
         updateDisplay();
+    }
+
+    /** CONST dialog — insert selected constant value (p010f0/d.java H(2)). */
+    private void showConstantsDialog() {
+        ConstantsDialog.show(this, constant ->
+                insertText(constant.getValue()));
+    }
+
+    /** CONV dialog — two-step unit pick; insert source value marker (p010f0/g.java H(3)). */
+    private void showConversionDialog() {
+        ConversionDialog.show(this, (fromUnit, toUnit) -> {
+            // Insert conversion: wrap current operand as " value <from> → <to> "
+            // Simplified: insert " <from> → <to> " marker after current expression end
+            String marker = " " + fromUnit + " → " + toUnit + " ";
+            insertText(marker);
+        });
+    }
+
+    /** STATS dialog — compute stats from numeric history results (p010f0/o.java H(6)). */
+    private void showStatisticsDialog() {
+        StatisticsDialog.show(this, () -> {
+            java.util.List<Double> nums = new ArrayList<>();
+            for (HistoryEntry e : mHistory) {
+                try {
+                    String r = e.result.replaceAll("</?[^/<>]+>", "").replace(",", "").trim();
+                    nums.add(Double.parseDouble(r));
+                } catch (Exception ignored) {}
+            }
+            if (nums.isEmpty()) return null;
+
+            int n = nums.size();
+            double min = nums.stream().mapToDouble(d -> d).min().orElse(0);
+            double max = nums.stream().mapToDouble(d -> d).max().orElse(0);
+            double sum = nums.stream().mapToDouble(d -> d).sum();
+            double mean = sum / n;
+            double varSum = 0;
+            for (double v : nums) varSum += (v - mean) * (v - mean);
+            double med;
+            java.util.List<Double> sorted = new ArrayList<>(nums);
+            java.util.Collections.sort(sorted);
+            if (n % 2 == 1) med = sorted.get(n / 2);
+            else med = (sorted.get(n / 2 - 1) + sorted.get(n / 2)) / 2.0;
+
+            java.util.List<String> rows = new ArrayList<>();
+            rows.add("n  : Quantity : " + n);
+            rows.add("↓  : Minimum : " + min);
+            rows.add("↑  : Maximum : " + max);
+            rows.add("↕  : Range : " + (max - min));
+            rows.add("x̃  : Median : " + med);
+            rows.add("x̅  : Mean (Average) : " + mean);
+            rows.add("Σx : Sum : " + sum);
+            rows.add("s² : Sample Variance : " + (n > 1 ? varSum / (n - 1) : 0));
+            rows.add("s  : Sample Standard Deviation : " + (n > 1 ? Math.sqrt(varSum / (n - 1)) : 0));
+            rows.add("σ² : Population Variance : " + (varSum / n));
+            rows.add("σ  : Population Standard Deviation : " + Math.sqrt(varSum / n));
+            return rows;
+        });
+    }
+
+    /** Shift a/b — DMS convert current expression (AlgebraicInputHandler case 103). */
+    private void convertCurrentToDms() {
+        String dms = DmsHelper.tryConvert(mCurrentInput.toString());
+        if (dms != null) {
+            mCurrentInput.setLength(0);
+            mCurrentInput.append(dms);
+            mCursorIndex = mCurrentInput.length();
+            evaluateLive();
+            updateDisplay();
+        } else {
+            // Fallback: append ° marker if not pure number
+            insertText("°");
+        }
     }
 
     private void evaluateLive() {
