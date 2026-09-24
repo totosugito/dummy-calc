@@ -37,6 +37,21 @@
         android:layout_height="1dp"
         android:background="#2E2E2E" />
 
+    <!-- Mode toggle bar: Simple / Scientific -->
+    <LinearLayout
+        android:id="@+id/mode_bar"
+        android:layout_width="match_parent"
+        android:layout_height="26dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical|right"
+        android:background="#121212">
+
+        <Button
+            android:id="@+id/btn_mode_toggle"
+            android:text="SCI"
+            style="@style/CalcSimpleButton.ModeToggle" />
+    </LinearLayout>
+
     <!-- 7-Row CalcTastic Simple Keypad Area (Bottom) -->
     <TableLayout
         android:id="@+id/simple_keypad"
@@ -118,7 +133,7 @@
                 style="@style/CalcSimpleButton.Function" />
             <Button
                 android:id="@+id/btn_power"
-                android:text="yˣ"
+                android:text="xʸ"
                 style="@style/CalcSimpleButton.Function" />
             <Button
                 android:id="@+id/btn_cursor_left"
@@ -234,6 +249,205 @@
                 style="@style/CalcSimpleButton.Number" />
             <Button
                 android:id="@+id/btn_equals"
+                android:text="="
+                android:layout_span="2"
+                style="@style/CalcSimpleButton.Equals" />
+        </TableRow>
+    </TableLayout>
+
+    <!-- 7-Row CalcTastic Scientific Keypad Area (hidden by default) -->
+    <TableLayout
+        android:id="@+id/scientific_keypad"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2.0"
+        android:padding="2dp"
+        android:stretchColumns="*"
+        android:visibility="gone">
+
+        <!-- Row 1 shift labels: —, ∠, HYP, PREC, —, — -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.35">
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="∠" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="HYP" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="PREC" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
+        </TableRow>
+
+        <!-- Row 1: SHIFT, i, DRG, FSE, MS, MR -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.7">
+            <Button android:id="@+id/sci_shift" android:text="SHIFT" style="@style/CalcSimpleButton.Shift" />
+            <Button android:id="@+id/sci_i" android:text="i" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_drg" android:text="DEG" style="@style/CalcSimpleButton.Secondary" />
+            <Button android:id="@+id/sci_fse" android:text="FIX" style="@style/CalcSimpleButton.Secondary" />
+            <Button android:id="@+id/sci_ms" android:text="MS" style="@style/CalcSimpleButton.Secondary" />
+            <Button android:id="@+id/sci_mr" android:text="MR" style="@style/CalcSimpleButton.Secondary" />
+        </TableRow>
+
+        <!-- Row 2 shift labels -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.35">
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="D°M'S&quot;" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="asin" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="acos" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="atan" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
+        </TableRow>
+
+        <!-- Row 2: a/b, Sin, Cos, Tan, (, ) -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.7">
+            <Button android:id="@+id/sci_fraction" android:text="a/b" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_sin" android:text="Sin" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_cos" android:text="Cos" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_tan" android:text="Tan" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_paren_open" android:text="(" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_paren_close" android:text=")" style="@style/CalcSimpleButton.Function" />
+        </TableRow>
+
+        <!-- Row 3 shift labels -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.35">
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="e" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="eˣ" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="10ˣ" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="|◀" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="▶|" />
+        </TableRow>
+
+        <!-- Row 3: 1/x, π, Ln, Log, ◀, ▶ -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.7">
+            <Button android:id="@+id/sci_reciprocal" android:text="1/x" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_pi" android:text="π" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_ln" android:text="Ln" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_log" android:text="Log" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_cursor_left" android:text="◀" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_cursor_right" android:text="▶" style="@style/CalcSimpleButton.Function" />
+        </TableRow>
+
+        <!-- Row 4 shift labels -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.35">
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="√x" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Ceil" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Re" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Im" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="MC" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="CLS" />
+        </TableRow>
+
+        <!-- Row 4: x², 7, 8, 9, DEL, CLR -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+            <Button android:id="@+id/sci_square" android:text="x²" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_7" android:text="7" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_8" android:text="8" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_9" android:text="9" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_delete" android:text="DEL" style="@style/CalcSimpleButton.Clear" />
+            <Button android:id="@+id/sci_clear" android:text="CLR" style="@style/CalcSimpleButton.Clear" />
+        </TableRow>
+
+        <!-- Row 5 shift labels -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.35">
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="ˣ√y" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Floor" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Abs" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Arg" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Conj" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Mod" />
+        </TableRow>
+
+        <!-- Row 5: yˣ, 4, 5, 6, ×, ÷ -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+            <Button android:id="@+id/sci_power" android:text="xʸ" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_4" android:text="4" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_5" android:text="5" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_6" android:text="6" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_mul" android:text="×" style="@style/CalcSimpleButton.Operator" />
+            <Button android:id="@+id/sci_div" android:text="÷" style="@style/CalcSimpleButton.Operator" />
+        </TableRow>
+
+        <!-- Row 6 shift labels -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.35">
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Δ%" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="x!" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="nPr" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="nCr" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="M+" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="M−" />
+        </TableRow>
+
+        <!-- Row 6: %, 1, 2, 3, +, − -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+            <Button android:id="@+id/sci_percent" android:text="%" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_1" android:text="1" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_2" android:text="2" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_3" android:text="3" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_add" android:text="+" style="@style/CalcSimpleButton.Operator" />
+            <Button android:id="@+id/sci_sub" android:text="−" style="@style/CalcSimpleButton.Operator" />
+        </TableRow>
+
+        <!-- Row 7 shift labels -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.35">
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="CONST" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="CONV" />
+            <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="STATS" />
+            <TextView
+                style="@style/CalcSimpleButton.ShiftLabel"
+                android:layout_column="4"
+                android:layout_span="2"
+                android:text="Random" />
+        </TableRow>
+
+        <!-- Row 7: EEX, 0, ., ±, = (weight 2) -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+            <Button android:id="@+id/sci_eex" android:text="EEX" style="@style/CalcSimpleButton.Function" />
+            <Button android:id="@+id/sci_0" android:text="0" style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_dot" android:text="." style="@style/CalcSimpleButton.Number" />
+            <Button android:id="@+id/sci_negate" android:text="±" style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/sci_equals"
                 android:text="="
                 android:layout_span="2"
                 style="@style/CalcSimpleButton.Equals" />

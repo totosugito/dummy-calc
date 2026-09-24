@@ -35,10 +35,21 @@ public class SimpleCalculatorActivity extends Activity {
     private ListView mListView;
     private DisplayAdapter mAdapter;
     private final List<HistoryEntry> mHistory = new ArrayList<>();
-    
+
     private final StringBuilder mCurrentInput = new StringBuilder();
     private int mCursorIndex = 0;
     private String mLiveResult = "";
+
+    private View mSimpleKeypad;
+    private View mScientificKeypad;
+    private Button mModeToggle;
+    private boolean mScientificMode = false;
+    private boolean mShiftActive = false;
+    private boolean mHyperbolic = false;
+    private String mAngleUnit = "DEG";   // AngleUnit: DEG / RAD / GRD
+    private String mNotation = "FIX";    // DecimalNotation: FIX / SCI / ENG
+    private String mMemoryValue = null;  // CalcMemory slot for MS/MR
+    private int mDecimalPrecision = 12;  // CalculatorManager.decimalPrecision default
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,8 +77,30 @@ public class SimpleCalculatorActivity extends Activity {
         String hist4Res = "111,222,333,444,555,666,777,888,999,000,111,222,333";
         mHistory.add(new HistoryEntry(hist4Expr, hist4Res, "="));
 
+        setupModeToggle();
         setupKeypad();
+        setupScientificKeypad();
         updateDisplay();
+    }
+
+    private void setupModeToggle() {
+        mSimpleKeypad = findViewById(R.id.simple_keypad);
+        mScientificKeypad = findViewById(R.id.scientific_keypad);
+        mModeToggle = findViewById(R.id.btn_mode_toggle);
+        if (mModeToggle != null) {
+            mModeToggle.setOnClickListener(v -> {
+                mScientificMode = !mScientificMode;
+                mShiftActive = false;
+                refreshShiftLabels();
+                if (mSimpleKeypad != null) {
+                    mSimpleKeypad.setVisibility(mScientificMode ? View.GONE : View.VISIBLE);
+                }
+                if (mScientificKeypad != null) {
+                    mScientificKeypad.setVisibility(mScientificMode ? View.VISIBLE : View.GONE);
+                }
+                mModeToggle.setText(mScientificMode ? "SIM" : "SCI");
+            });
+        }
     }
 
     private void setupKeypad() {
@@ -96,18 +129,19 @@ public class SimpleCalculatorActivity extends Activity {
             }
         }
 
-        // Memory buttons: As requested, ignore click events (just display buttons)
-        int[] memButtons = {
-            R.id.btn_mem_plus, R.id.btn_mem_minus, R.id.btn_mem_clear, R.id.btn_mem_save, R.id.btn_mem_recall
-        };
-        for (int id : memButtons) {
-            Button btn = findViewById(id);
-            if (btn != null) {
-                btn.setOnClickListener(v -> {
-                    // Click ignored as requested
-                });
-            }
-        }
+        // Memory row (simple keypad): same side-effects as original MEMORY_* commands
+        Button memPlus = findViewById(R.id.btn_mem_plus);
+        if (memPlus != null) memPlus.setOnClickListener(v -> memoryPlusMinus(true));
+        Button memMinus = findViewById(R.id.btn_mem_minus);
+        if (memMinus != null) memMinus.setOnClickListener(v -> memoryPlusMinus(false));
+        Button memClear = findViewById(R.id.btn_mem_clear);
+        if (memClear != null) memClear.setOnClickListener(v -> mMemoryValue = null);
+        Button memSave = findViewById(R.id.btn_mem_save);
+        if (memSave != null) memSave.setOnClickListener(v -> memorySave());
+        Button memRecall = findViewById(R.id.btn_mem_recall);
+        if (memRecall != null) memRecall.setOnClickListener(v -> {
+            if (mMemoryValue != null && !mMemoryValue.isEmpty()) insertText(mMemoryValue);
+        });
 
         // Number buttons: 0 - 9 and dot
         int[] numButtons = {
@@ -161,22 +195,22 @@ public class SimpleCalculatorActivity extends Activity {
             btnPercent.setOnClickListener(v -> insertText("%"));
         }
 
-        // Sqrt (√x): inserts "√("
+        // SQRT plain="√" — ordinal 89, NOT in auto-paren set 68–86
         Button btnSqrt = findViewById(R.id.btn_sqrt);
         if (btnSqrt != null) {
-            btnSqrt.setOnClickListener(v -> insertText("√("));
+            btnSqrt.setOnClickListener(v -> insertText("√"));
         }
 
-        // Square: inserts "²"
+        // SQUARE plain="²" — ordinal 88, no auto "("
         Button btnSquare = findViewById(R.id.btn_square);
         if (btnSquare != null) {
             btnSquare.setOnClickListener(v -> insertText("²"));
         }
 
-        // Reciprocal: inserts "1 / "
+        // RECIPROCAL plain="1/" — ordinal 92, no auto "("
         Button btnReciprocal = findViewById(R.id.btn_reciprocal);
         if (btnReciprocal != null) {
-            btnReciprocal.setOnClickListener(v -> insertText("1 / "));
+            btnReciprocal.setOnClickListener(v -> insertText("1/"));
         }
 
         // Cursor navigation buttons: ◀ and ▶
@@ -220,17 +254,10 @@ public class SimpleCalculatorActivity extends Activity {
             });
         }
 
-        // Delete (Backspace)
+        // Delete (Backspace) — same entry rules as scientific DEL
         Button btnDelete = findViewById(R.id.btn_delete);
         if (btnDelete != null) {
-            btnDelete.setOnClickListener(v -> {
-                if (mCursorIndex > 0 && mCurrentInput.length() > 0) {
-                    mCurrentInput.deleteCharAt(mCursorIndex - 1);
-                    mCursorIndex--;
-                    evaluateLive();
-                    updateDisplay();
-                }
-            });
+            btnDelete.setOnClickListener(v -> backspaceEntry());
         }
 
         // Equals
@@ -240,10 +267,500 @@ public class SimpleCalculatorActivity extends Activity {
         }
     }
 
+    /**
+     * Scientific keypad wiring.
+     * Insert strings come from CalculatorCommand.equationStringPlain in the
+     * decompiled original (raw/.../CalculatorCommand.java). Shift pairs follow
+     * keyboard_portrait_full.xml + SCIENTIFIC_DESIGN.md (SHIFT_BUTTON_* labels).
+     */
+    private void setupScientificKeypad() {
+        int[] allSciButtons = {
+            R.id.sci_shift, R.id.sci_i, R.id.sci_drg, R.id.sci_fse, R.id.sci_ms, R.id.sci_mr,
+            R.id.sci_fraction, R.id.sci_sin, R.id.sci_cos, R.id.sci_tan, R.id.sci_paren_open, R.id.sci_paren_close,
+            R.id.sci_reciprocal, R.id.sci_pi, R.id.sci_ln, R.id.sci_log, R.id.sci_cursor_left, R.id.sci_cursor_right,
+            R.id.sci_square, R.id.sci_7, R.id.sci_8, R.id.sci_9, R.id.sci_delete, R.id.sci_clear,
+            R.id.sci_power, R.id.sci_4, R.id.sci_5, R.id.sci_6, R.id.sci_mul, R.id.sci_div,
+            R.id.sci_percent, R.id.sci_1, R.id.sci_2, R.id.sci_3, R.id.sci_add, R.id.sci_sub,
+            R.id.sci_eex, R.id.sci_0, R.id.sci_dot, R.id.sci_negate, R.id.sci_equals
+        };
+        for (int id : allSciButtons) {
+            View btn = findViewById(id);
+            if (btn != null) {
+                btn.setFocusable(false);
+                btn.setFocusableInTouchMode(false);
+            }
+        }
+
+        // KEYBOARD_SHIFT — toggles 2nd/shift mode (no equation string)
+        wireSci(R.id.sci_shift, () -> {
+            mShiftActive = !mShiftActive;
+            refreshShiftLabels();
+        });
+
+        // ANGLE_UNIT (DRG): cycle DEG → RAD → GRD (AngleUnit enum in original)
+        // HYPERBOLIC (HYP): shift toggles hyperbolic flag on trig labels
+        Button btnDrg = findViewById(R.id.sci_drg);
+        if (btnDrg != null) {
+            btnDrg.setOnClickListener(v -> {
+                if (mShiftActive) {
+                    mShiftActive = false;
+                    mHyperbolic = !mHyperbolic;
+                    refreshShiftLabels();
+                    return;
+                }
+                if ("DEG".equals(mAngleUnit)) mAngleUnit = "RAD";
+                else if ("RAD".equals(mAngleUnit)) mAngleUnit = "GRD";
+                else mAngleUnit = "DEG";
+                btnDrg.setText(mAngleUnit);
+            });
+        }
+
+        // NOTATION (FSE): cycle FIX → SCI → ENG (DecimalNotation.f / .b())
+        // PRECISION (shift): label "P:"+decimalPrecision (f.java case 111); dialog later
+        Button btnFse = findViewById(R.id.sci_fse);
+        if (btnFse != null) {
+            btnFse.setOnClickListener(v -> {
+                if (mShiftActive) {
+                    mShiftActive = false;
+                    refreshShiftLabels();
+                    // PRECISION dialog placeholder — keep showing P:n then restore on next refresh
+                    return;
+                }
+                if ("FIX".equals(mNotation)) mNotation = "SCI";
+                else if ("SCI".equals(mNotation)) mNotation = "ENG";
+                else mNotation = "FIX";
+                btnFse.setText(mNotation);
+            });
+        }
+
+        // MEMORY_SAVE stores current operand to register 0 (Calculator.java case 44)
+        wireSci(R.id.sci_ms, () -> {
+            if (consumeShift()) return;
+            memorySave();
+        });
+        wireSci(R.id.sci_mr, () -> {
+            if (consumeShift()) return;
+            if (mMemoryValue != null && !mMemoryValue.isEmpty()) {
+                insertText(mMemoryValue);
+            }
+        });
+
+        // Numbers + decimal: equationStringPlain == keyboard digit
+        int[] sciNumButtons = {
+            R.id.sci_0, R.id.sci_1, R.id.sci_2, R.id.sci_3, R.id.sci_4,
+            R.id.sci_5, R.id.sci_6, R.id.sci_7, R.id.sci_8, R.id.sci_9,
+            R.id.sci_dot
+        };
+        for (int id : sciNumButtons) {
+            final int buttonId = id;
+            Button btn = findViewById(id);
+            if (btn != null) {
+                btn.setOnClickListener(v -> {
+                    String shiftPlain = digitShiftPlain(buttonId);
+                    if (shiftPlain != null && mShiftActive) {
+                        mShiftActive = false;
+                        refreshShiftLabels();
+                        if (shiftPlain.isEmpty()) {
+                            // CONST / CONV / STATS — dialogs, no equation insert
+                            return;
+                        }
+                        // ceil/floor/abs/arg/re/im are ordinal 68–86 → auto "("
+                        insertFunction(shiftPlain);
+                        return;
+                    }
+                    insertText(((Button) v).getText().toString());
+                });
+            }
+        }
+
+        // Binary operators — plain strings include surrounding spaces
+        // Shift +: MEMORY_PLUS — memory[0] += current operand (Calculator.java case 48)
+        wireSci(R.id.sci_add, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); memoryPlusMinus(true); return; }
+            insertText(" + ");
+        });
+        // Shift −: MEMORY_MINUS — memory[0] −= current operand (Calculator.java case 49)
+        wireSci(R.id.sci_sub, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); memoryPlusMinus(false); return; }
+            insertText(" − ");
+        });
+        // × shift → COMPLEX_CONJUGATE plain="conj" + auto "(" (ordinal 80)
+        wireSci(R.id.sci_mul, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertFunction("conj"); return; }
+            insertText(" × ");
+        });
+        wireSci(R.id.sci_div, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText(" mod "); return; } // MODULO
+            insertText(" / ");
+        });
+
+        // FRACTION plain="/"; shift DMS_DEGREES plain="°"
+        wireSci(R.id.sci_fraction, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("°"); return; }
+            insertText("/");
+        });
+
+        // Trig / ln / log: Equation.T() ordinal 68–86 auto-appends "(" after function.
+        wireSci(R.id.sci_sin, () -> insertShiftableFunc("sin", "asin"));
+        wireSci(R.id.sci_cos, () -> insertShiftableFunc("cos", "acos"));
+        wireSci(R.id.sci_tan, () -> insertShiftableFunc("tan", "atan"));
+
+        // COMPLEX_RECT plain="i"; shift COMPLEX_POLAR plain="∠"
+        wireSci(R.id.sci_i, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("∠"); return; }
+            insertText("i");
+        });
+
+        wireSci(R.id.sci_paren_open, () -> insertText("("));
+        wireSci(R.id.sci_paren_close, () -> insertText(")"));
+
+        // RECIPROCAL plain="1/"
+        wireSci(R.id.sci_reciprocal, () -> {
+            if (consumeShift()) return; // design: no shift on 1/x in portrait_full? label empty
+            insertText("1/");
+        });
+        // CONST_PI plain="π"; shift CONST_E plain="e"
+        wireSci(R.id.sci_pi, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("e"); return; }
+            insertText("π");
+        });
+        // LOG_E plain="ln" + auto "(" (ordinal 71); shift EXP_E plain="e^" — ordinal 90, NO auto "("
+        wireSci(R.id.sci_ln, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("e^"); return; }
+            insertFunction("ln");
+        });
+        // LOG_10 plain="log" + auto "(" (ordinal 72); shift EXP_10 plain="10^" — NO auto "("
+        wireSci(R.id.sci_log, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("10^"); return; }
+            insertFunction("log");
+        });
+
+        // CURSOR_LEFT / CURSOR_RIGHT; shift HOME / END (no equation string)
+        Button sciCursorLeft = findViewById(R.id.sci_cursor_left);
+        if (sciCursorLeft != null) {
+            sciCursorLeft.setOnClickListener(v -> {
+                if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); mCursorIndex = 0; updateDisplay(); return; }
+                if (mCursorIndex > 0) { mCursorIndex--; updateDisplay(); }
+            });
+        }
+        Button sciCursorRight = findViewById(R.id.sci_cursor_right);
+        if (sciCursorRight != null) {
+            sciCursorRight.setOnClickListener(v -> {
+                if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); mCursorIndex = mCurrentInput.length(); updateDisplay(); return; }
+                if (mCursorIndex < mCurrentInput.length()) { mCursorIndex++; updateDisplay(); }
+            });
+        }
+
+        // SQUARE plain="²"; shift SQRT plain="√"
+        wireSci(R.id.sci_square, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("√"); return; }
+            insertText("²");
+        });
+
+        // BACKSPACE; shift MEMORY_CLEAR — clear register 0 (Calculator.java case 46)
+        Button sciDelete = findViewById(R.id.sci_delete);
+        if (sciDelete != null) {
+            sciDelete.setOnClickListener(v -> {
+                if (mShiftActive) {
+                    mShiftActive = false;
+                    refreshShiftLabels();
+                    mMemoryValue = null; // CalcMemory.e(0)
+                    return;
+                }
+                backspaceEntry();
+            });
+        }
+
+        // CLEAR; shift CLEAR_SCREEN (clears history too)
+        Button sciClear = findViewById(R.id.sci_clear);
+        if (sciClear != null) {
+            sciClear.setOnClickListener(v -> {
+                if (mShiftActive) {
+                    mShiftActive = false;
+                    refreshShiftLabels();
+                    mHistory.clear();
+                    updateDisplay();
+                    return;
+                }
+                mCurrentInput.setLength(0);
+                mCursorIndex = 0;
+                mLiveResult = "";
+                updateDisplay();
+            });
+        }
+
+        // POWER plain="^"; shift NTH_ROOT plain="√"
+        wireSci(R.id.sci_power, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText("√"); return; }
+            insertText("^");
+        });
+
+        // PERCENT plain="%"; shift DELTA_PERCENT plain=" Δ% "
+        wireSci(R.id.sci_percent, () -> {
+            if (mShiftActive) { mShiftActive = false; refreshShiftLabels(); insertText(" Δ% "); return; }
+            insertText("%");
+        });
+
+        // EXPONENT (EEX) plain="E"
+        wireSci(R.id.sci_eex, () -> {
+            if (consumeShift()) return;
+            insertText("E");
+        });
+        // NEGATE plain="-"; shift STATISTIC — dialog placeholder
+        wireSci(R.id.sci_negate, () -> {
+            if (consumeShift()) return;
+            insertText("-");
+        });
+
+        // EQUALS — evaluate; shift CONST_RAND — random in [0,1), no plain string
+        Button sciEquals = findViewById(R.id.sci_equals);
+        if (sciEquals != null) {
+            sciEquals.setOnClickListener(v -> {
+                if (mShiftActive) {
+                    mShiftActive = false;
+                    refreshShiftLabels();
+                    double r = Math.random();
+                    insertText(r == (long) r ? String.valueOf((long) r) : String.valueOf(r));
+                    return;
+                }
+                performEqualsCalculation();
+            });
+        }
+    }
+
+    /** Shift plain strings for digit keys (SCIENTIFIC_DESIGN / g.java shift labels). Empty = dialog, no insert. */
+    private String digitShiftPlain(int id) {
+        if (!mShiftActive) return null;
+        if (id == R.id.sci_7) return "ceil";   // CEILING
+        if (id == R.id.sci_8) return "re";     // COMPLEX_REAL
+        if (id == R.id.sci_9) return "im";     // COMPLEX_IMAGINARY
+        if (id == R.id.sci_4) return "floor";  // FLOOR
+        if (id == R.id.sci_5) return "abs";    // ABSOLUTE
+        if (id == R.id.sci_6) return "arg";    // COMPLEX_ARGUMENT
+        if (id == R.id.sci_1) return "!";      // FACTORIAL
+        if (id == R.id.sci_2) return " nPr ";  // NPR
+        if (id == R.id.sci_3) return " nCr ";  // NCR
+        if (id == R.id.sci_0) return "";       // CONST — dialog
+        if (id == R.id.sci_dot) return "";     // CONVERT_UNIT — dialog
+        return null;
+    }
+
+    private void wireSci(int id, Runnable action) {
+        Button btn = findViewById(id);
+        if (btn != null) {
+            btn.setOnClickListener(v -> action.run());
+        }
+    }
+
+    /**
+     * Functions that Equation.T() auto-appends "(" for (ordinals 68–86 in original).
+     * NOT included (87+): ! ² √ e^ 10^ 1/ % -
+     */
+    private static final String[] AUTO_PAREN_FUNCTIONS = {
+        "abs", "ceil", "floor", "ln", "log",
+        "sin", "cos", "tan", "asin", "acos", "atan",
+        "arg", "conj", "re", "im"
+    };
+
+    /** Multi-char operator plains (one entry on backspace). Plain strings from CalculatorCommand. */
+    private static final String[] OPERATOR_TOKENS = {
+        " Δ% ", " nPr ", " nCr ", " mod ", " + ", " − ", " × ", " / "
+    };
+
+    /** Postfix / compact plains with no auto "(" (ordinals 87–95, 102+). */
+    private static final String[] POSTFIX_TOKENS = {
+        "10^", "e^", "1/", "²", "√", "°", "!"
+    };
+
+    private static boolean isAutoParenFunction(String name) {
+        for (String f : AUTO_PAREN_FUNCTIONS) {
+            if (f.equals(name)) return true;
+        }
+        return false;
+    }
+
+    /** Insert function name + auto "(" — mirrors Equation.T() cases 68–86. */
+    private void insertFunction(String plain) {
+        insertText(isAutoParenFunction(plain) ? plain + "(" : plain);
+    }
+
+    private void insertShiftableFunc(String mainPlain, String shiftPlain) {
+        if (mShiftActive) {
+            mShiftActive = false;
+            refreshShiftLabels();
+            insertFunction(shiftPlain);
+        } else {
+            insertFunction(mainPlain);
+        }
+    }
+
+    /**
+     * Entry-style backspace (string model of Equation.b() + AlgebraicInputHandler case 27).
+     * Deleting "(" that belongs to a function also removes the function name (Equation.b:332–334).
+     */
+    private void backspaceEntry() {
+        if (mCursorIndex <= 0 || mCurrentInput.length() == 0) return;
+        int end = mCursorIndex;
+        String before = mCurrentInput.substring(0, end);
+        int start = end - 1;
+
+        // Multi-char operators are one entry
+        for (String op : OPERATOR_TOKENS) {
+            if (before.endsWith(op)) {
+                start = end - op.length();
+                break;
+            }
+        }
+
+        // Compact postfix tokens (e^, 10^, 1/, ², √, °, !)
+        if (start == end - 1) {
+            String other = longestSuffix(POSTFIX_TOKENS, before);
+            if (other != null) {
+                start = end - other.length();
+            }
+        }
+
+        // Equation.b: if deleting "(", and previous entry is a function → delete function too
+        if (start == end - 1 && mCurrentInput.charAt(start) == '(') {
+            String prefix = mCurrentInput.substring(0, start);
+            String func = longestSuffix(AUTO_PAREN_FUNCTIONS, prefix);
+            if (func != null) {
+                start -= func.length();
+            }
+        }
+
+        // Deleting a bare function name (no paren yet) removes the whole name
+        if (start == end - 1 && Character.isLetter(mCurrentInput.charAt(start))) {
+            String func = longestSuffix(AUTO_PAREN_FUNCTIONS, before);
+            if (func != null && before.length() == func.length()
+                    || (func != null && before.charAt(before.length() - func.length() - 1) == ' ')) {
+                start = end - func.length();
+            }
+        }
+
+        if (start < 0) start = 0;
+        mCurrentInput.delete(start, end);
+        mCursorIndex = start;
+        evaluateLive();
+        updateDisplay();
+    }
+
+    private static String longestSuffix(String[] candidates, String s) {
+        String best = null;
+        for (String c : candidates) {
+            if (s.endsWith(c) && (best == null || c.length() > best.length())) {
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    private boolean consumeShift() {
+        if (mShiftActive) {
+            mShiftActive = false;
+            refreshShiftLabels();
+            return true;
+        }
+        return false;
+    }
+
+    /** Current operand as plain string — live result preferred, else raw input (like inputHandler.e()). */
+    private String currentOperandString() {
+        if (mLiveResult != null && !mLiveResult.isEmpty()) {
+            return mLiveResult.replaceFirst("^<o>=</o>\\s*", "").trim();
+        }
+        return mCurrentInput.toString().trim();
+    }
+
+    private double parseOperand(String s) {
+        if (s == null || s.isEmpty()) return 0;
+        try {
+            return Double.parseDouble(s.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private static String formatMem(double v) {
+        if (v == (long) v) return String.valueOf((long) v);
+        return String.valueOf(v);
+    }
+
+    /** MEMORY_SAVE (ordinal 44): store current operand into register 0. */
+    private void memorySave() {
+        String cur = currentOperandString();
+        if (!cur.isEmpty()) {
+            mMemoryValue = formatMem(parseOperand(cur));
+        }
+    }
+
+    /**
+     * MEMORY_PLUS/MINUS (ordinals 48/49), Calculator.java:155–165:
+     * mem0 = (mem0 or identity) ± currentOperand; store to register 0.
+     */
+    private void memoryPlusMinus(boolean plus) {
+        double cur = parseOperand(currentOperandString());
+        double mem = (mMemoryValue == null || mMemoryValue.isEmpty()) ? 0 : parseOperand(mMemoryValue);
+        double result = plus ? mem + cur : mem - cur;
+        mMemoryValue = formatMem(result);
+    }
+
+    private void refreshShiftLabels() {
+        Button shift = findViewById(R.id.sci_shift);
+        if (shift != null) {
+            shift.setAlpha(mShiftActive ? 1.0f : 0.7f);
+        }
+
+        // f.java: FSE main label is DecimalNotation.b(); when shift shows PRECISION command → "P:"+precision
+        Button fse = findViewById(R.id.sci_fse);
+        if (fse != null) {
+            if (mShiftActive) {
+                fse.setText("P:" + mDecimalPrecision);
+            } else {
+                fse.setText(mNotation);
+            }
+        }
+
+        // f.java case 52 POWER: zE0 = inputMethod.e() = !algebraic; sample is ALGEBRAIC → "xʸ"
+        // (already set in layout; re-assert in case something overwrote it)
+        Button power = findViewById(R.id.sci_power);
+        if (power != null && !mShiftActive) {
+            power.setText("xʸ");
+        }
+
+        int[] digits = {
+            R.id.sci_0, R.id.sci_1, R.id.sci_2, R.id.sci_3, R.id.sci_4,
+            R.id.sci_5, R.id.sci_6, R.id.sci_7, R.id.sci_8, R.id.sci_9
+        };
+        String[] mainLabels = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+        for (int i = 0; i < digits.length; i++) {
+            Button b = findViewById(digits[i]);
+            if (b != null) {
+                b.setText(mainLabels[i]);
+            }
+        }
+        // Trig labels: keyboardText + "h" when hyperbolic (f.java case 73–78)
+        int[] trig = { R.id.sci_sin, R.id.sci_cos, R.id.sci_tan };
+        String[] trigBase = { "Sin", "Cos", "Tan" };
+        for (int i = 0; i < trig.length; i++) {
+            Button b = findViewById(trig[i]);
+            if (b != null) {
+                if (mShiftActive) {
+                    // shift labels asin/acos/atan
+                    String[] shiftLabels = { "asin", "acos", "atan" };
+                    b.setText(shiftLabels[i]);
+                } else {
+                    b.setText(mHyperbolic ? trigBase[i] + "h" : trigBase[i]);
+                }
+            }
+        }
+    }
+
     private void performEqualsCalculation() {
         if (mCurrentInput.length() > 0) {
             String res = evaluateExpression(mCurrentInput.toString());
-            String formattedInput = NumberFormatHelper.formatEquation(mCurrentInput.toString().trim(), 0).taggedText;
+            String formattedInput = decorateAngleFunctions(
+                    NumberFormatHelper.formatEquation(mCurrentInput.toString().trim(), 0).taggedText);
             String formattedRes = NumberFormatHelper.formatEquation(res, 0).taggedText;
             mHistory.add(new HistoryEntry(formattedInput, formattedRes, "="));
             mCurrentInput.setLength(0);
@@ -278,9 +795,16 @@ public class SimpleCalculatorActivity extends Activity {
             mLiveResult = "";
             return;
         }
+        // Skip eval while expression is incomplete (unclosed paren / trailing token)
+        // — avoids regex-heavy evaluateExpression on every keystroke (perf)
+        String raw = mCurrentInput.toString();
+        if (!isExpressionComplete(raw)) {
+            mLiveResult = "";
+            return;
+        }
         try {
-            String eval = evaluateExpression(mCurrentInput.toString());
-            if (eval != null && !eval.isEmpty() && !eval.equals(mCurrentInput.toString().trim())) {
+            String eval = evaluateExpression(raw);
+            if (eval != null && !eval.isEmpty() && !eval.equals(raw.trim())) {
                 String formattedLive = NumberFormatHelper.formatEquation(eval, 0).taggedText;
                 mLiveResult = "<o>=</o> " + formattedLive;
             } else {
@@ -291,29 +815,67 @@ public class SimpleCalculatorActivity extends Activity {
         }
     }
 
+    /** True when parens balance and string does not end mid-function/operator. */
+    private static boolean isExpressionComplete(String s) {
+        if (s == null || s.isEmpty()) return false;
+        int depth = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+            if (depth < 0) return false;
+        }
+        if (depth != 0) return false;
+        char last = s.charAt(s.length() - 1);
+        if (last == '+' || last == '-' || last == '−' || last == '×' || last == '*'
+                || last == '÷' || last == '/' || last == '^' || last == '(') {
+            return false;
+        }
+        // trailing incomplete function name (sin without paren yet)
+        String t = s.trim();
+        for (String fn : AUTO_PAREN_FUNCTIONS) {
+            if (t.endsWith(fn) && t.length() == fn.length()) return false;
+        }
+        return true;
+    }
+
     private String evaluateExpression(String raw) {
         try {
             String expr = raw.replaceAll("×", "*")
                              .replaceAll("÷", "/")
                              .replaceAll("−", "-")
-                             .replaceAll("π", String.valueOf(Math.PI))
+                             .replaceAll("π", "(" + Double.toString(Math.PI) + ")")
                              .replaceAll("²", "^2")
                              .trim();
+            if (expr.isEmpty()) return raw;
 
-            // Evaluate simple square root pattern √(x)
-            while (expr.contains("√(")) {
-                int start = expr.indexOf("√(");
-                int end = expr.indexOf(")", start);
-                if (end > start) {
-                    String inner = expr.substring(start + 2, end).trim();
-                    double val = Double.parseDouble(inner);
-                    expr = expr.substring(0, start) + Math.sqrt(val) + expr.substring(end + 1);
-                } else {
-                    break;
-                }
-            }
+            // Constant e (standalone, not inside identifiers) — CONST_E plain "e"
+            expr = expr.replaceAll("(?<![A-Za-z0-9.])e(?![A-Za-z0-9])", Double.toString(Math.E));
 
-            // Check if entire expr is a single fraction: whole/numer/denom or numer/denom
+            // √(x) prefix (SQRT / NTH_ROOT plain "√")
+            expr = evalSqrtCalls(expr);
+
+            // Function calls: innermost name(...) first — ordinals 68–86 auto-paren set
+            expr = evalFunctionCalls(expr);
+
+            // Ensure binary operators are space-separated for token pass
+            expr = normalizeOpSpaces(expr);
+
+            // Postfix / compact tokens
+            expr = evalPostfix(expr);
+
+            // Powers a^b
+            expr = evalPowers(expr);
+
+            // Percent: 50% → 0.5 (FloatingPoint case 93 movePointLeft(2))
+            expr = evalPercent(expr);
+
+            // Word operators: mod, nPr, nCr, Δ%
+            expr = evalWordOps(expr);
+
+            expr = normalizeOpSpaces(expr);
+
+            // Fraction check (entire expr)
             if (expr.matches("^(\\d+/)?\\d+/\\d+$")) {
                 String[] parts = expr.split("/");
                 if (parts.length == 2) {
@@ -328,42 +890,16 @@ public class SimpleCalculatorActivity extends Activity {
                     long n = Long.parseLong(parts[1]);
                     long d = Long.parseLong(parts[2]);
                     if (d != 0) {
-                        long totalNum = (w * d) + n;
                         return w + "/" + n + "/" + d;
                     }
                 }
             }
 
-            // Evaluate compact power patterns like a^b (e.g. 2^3 or 5^2)
-            while (expr.contains("^")) {
-                int caretIdx = expr.indexOf("^");
-                // find base left of caret
-                int baseStart = caretIdx - 1;
-                while (baseStart >= 0 && (Character.isDigit(expr.charAt(baseStart)) || expr.charAt(baseStart) == '.')) {
-                    baseStart--;
-                }
-                baseStart++;
-
-                // find exp right of caret
-                int expEnd = caretIdx + 1;
-                if (expEnd < expr.length() && expr.charAt(expEnd) == '-') expEnd++;
-                while (expEnd < expr.length() && (Character.isDigit(expr.charAt(expEnd)) || expr.charAt(expEnd) == '.')) {
-                    expEnd++;
-                }
-
-                if (baseStart < caretIdx && expEnd > caretIdx + 1) {
-                    double baseVal = Double.parseDouble(expr.substring(baseStart, caretIdx));
-                    double expVal = Double.parseDouble(expr.substring(caretIdx + 1, expEnd));
-                    double powRes = Math.pow(baseVal, expVal);
-                    String powResStr = (powRes == (long) powRes) ? String.valueOf((long) powRes) : String.valueOf(powRes);
-                    expr = expr.substring(0, baseStart) + powResStr + expr.substring(expEnd);
-                } else {
-                    break;
-                }
+            String[] tokens = expr.trim().split("\\s+");
+            if (tokens.length == 1) {
+                double v = parseNumberOrFraction(tokens[0]);
+                return formatNumber(v);
             }
-
-            // Simple tokens evaluation or multi-step
-            String[] tokens = expr.split("\\s+");
             if (tokens.length >= 3) {
                 double a = parseNumberOrFraction(tokens[0]);
                 int idx = 1;
@@ -373,16 +909,408 @@ public class SimpleCalculatorActivity extends Activity {
                     if ("+".equals(op)) a = a + b;
                     else if ("-".equals(op)) a = a - b;
                     else if ("*".equals(op)) a = a * b;
-                    else if ("/".equals(op)) a = (b != 0) ? a / b : 0;
+                    else if ("/".equals(op)) a = (b != 0) ? a / b : Double.NaN;
                     else if ("^".equals(op)) a = Math.pow(a, b);
                     idx += 2;
                 }
-                return (a == (long) a) ? String.format("%d", (long) a) : String.format("%s", a);
+                return formatNumber(a);
             }
             return expr;
         } catch (Exception e) {
             return raw;
         }
+    }
+
+    private static String formatNumber(double v) {
+        if (Double.isNaN(v) || Double.isInfinite(v)) return String.valueOf(v);
+        if (v == (long) v && Math.abs(v) < 1e15) return String.valueOf((long) v);
+        return String.valueOf(v);
+    }
+
+    /** √(x) → sqrt — SQRT/NTH_ROOT use plain "√". */
+    private String evalSqrtCalls(String expr) {
+        boolean progress = true;
+        while (progress && expr.contains("√(")) {
+            progress = false;
+            int start = expr.indexOf("√(");
+            int depth = 0;
+            int end = -1;
+            for (int i = start + 1; i < expr.length(); i++) {
+                char c = expr.charAt(i);
+                if (c == '(') depth++;
+                else if (c == ')') {
+                    depth--;
+                    if (depth == 0) { end = i; break; }
+                }
+            }
+            if (end <= start) break;
+            String inner = expr.substring(start + 2, end);
+            if (inner.indexOf('(') >= 0) {
+                // evaluate inner first on next loop via function pass; just recurse once
+                expr = expr.substring(0, start + 2) + evalSqrtCalls(inner) + expr.substring(end);
+                progress = true;
+                continue;
+            }
+            try {
+                double v = parseNumberOrFraction(evalPowers(inner.trim()));
+                expr = expr.substring(0, start) + formatNumber(Math.sqrt(v)) + expr.substring(end + 1);
+                progress = true;
+            } catch (Exception e) {
+                break;
+            }
+        }
+        return expr;
+    }
+
+    /** Space-separate binary + - * / for the token evaluator (keep leading unary minus). */
+    private static String normalizeOpSpaces(String expr) {
+        StringBuilder sb = new StringBuilder(expr.trim());
+        for (int i = 0; i < sb.length(); i++) {
+            char c = sb.charAt(i);
+            if (c == '+' || c == '*' || c == '/') {
+                if (i > 0 && sb.charAt(i - 1) != ' ') {
+                    sb.insert(i, ' ');
+                    i++;
+                }
+                if (i + 1 < sb.length() && sb.charAt(i + 1) != ' ') {
+                    sb.insert(i + 1, ' ');
+                    i++;
+                }
+            } else if (c == '-') {
+                // binary minus only (not unary after op/start/open)
+                if (i > 0) {
+                    char p = sb.charAt(i - 1);
+                    boolean unary = (p == '(' || p == '+' || p == '-' || p == '*' || p == '/' || p == ' ');
+                    // also " - " already spaced word ops
+                    if (!unary && p != ' ') {
+                        if (sb.charAt(i - 1) != ' ') {
+                            sb.insert(i, ' ');
+                            i++;
+                        }
+                        if (i + 1 < sb.length() && sb.charAt(i + 1) != ' ') {
+                            sb.insert(i + 1, ' ');
+                            i++;
+                        }
+                    }
+                }
+            }
+        }
+        return sb.toString().replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * Evaluate func(args) where args has no nested '('.
+     * Angle units follow AngleUnit: convert to rad for sin/cos/tan, from rad for inverses.
+     * Hyperbolic mode (mHyperbolic) uses sinh/cosh/tanh (FloatingPoint cases 73–75 z2 branch).
+     */
+    private String evalFunctionCalls(String expr) {
+        boolean progress = true;
+        while (progress) {
+            progress = false;
+            int open = -1;
+            // find innermost '('
+            for (int i = expr.length() - 1; i >= 0; i--) {
+                if (expr.charAt(i) == '(') { open = i; break; }
+            }
+            if (open < 0) break;
+            int close = expr.indexOf(')', open);
+            if (close < 0) break;
+            // ensure no nested ( between open and close
+            if (expr.substring(open + 1, close).indexOf('(') >= 0) {
+                // shift search left of this open
+                String left = expr.substring(0, open);
+                int nested = left.lastIndexOf('(');
+                if (nested < 0) break;
+                open = nested;
+                close = expr.indexOf(')', open);
+                if (close < 0) break;
+                if (expr.substring(open + 1, close).indexOf('(') >= 0) continue;
+            }
+            String inner = expr.substring(open + 1, close).trim();
+            // function name before '('
+            int nameStart = open;
+            while (nameStart > 0 && (Character.isLetter(expr.charAt(nameStart - 1)))) nameStart--;
+            String name = expr.substring(nameStart, open);
+
+            if (name.isEmpty()) {
+                // bare (expr) → evaluate inner if pure number context later; strip one level if fully wrapped
+                if (nameStart == 0 && close == expr.length() - 1) {
+                    expr = inner;
+                    progress = true;
+                }
+                continue;
+            }
+
+            double arg;
+            try {
+                // inner may still contain ^ or spaces
+                String innerEval = evalPowers(inner.replaceAll("π", Double.toString(Math.PI)));
+                arg = parseNumberOrFraction(innerEval.trim());
+            } catch (Exception e) {
+                break;
+            }
+
+            Double result = applyFunction(name, arg);
+            if (result == null) break;
+            expr = expr.substring(0, nameStart) + formatNumber(result) + expr.substring(close + 1);
+            progress = true;
+        }
+        return expr;
+    }
+
+    /** Map function name → value. Returns null if unknown/incomplete. */
+    private Double applyFunction(String name, double x) {
+        switch (name) {
+            case "sin":
+                return mHyperbolic ? Math.sinh(x) : Math.sin(toRadians(x));
+            case "cos":
+                return mHyperbolic ? Math.cosh(x) : Math.cos(toRadians(x));
+            case "tan":
+                return mHyperbolic ? Math.tanh(x) : Math.tan(toRadians(x));
+            case "asin": {
+                if (mHyperbolic) return asinh(x);
+                double r = Math.asin(x);
+                return fromRadians(r);
+            }
+            case "acos": {
+                if (mHyperbolic) return acosh(x);
+                double r = Math.acos(x);
+                return fromRadians(r);
+            }
+            case "atan": {
+                if (mHyperbolic) return atanh(x);
+                double r = Math.atan(x);
+                return fromRadians(r);
+            }
+            case "ln":
+                return x > 0 ? Math.log(x) : Double.NaN;
+            case "log":
+                return x > 0 ? Math.log10(x) : Double.NaN;
+            case "abs":
+                return Math.abs(x);
+            case "ceil":
+                return Math.ceil(x);
+            case "floor":
+                return Math.floor(x);
+            case "arg":
+                // COMPLEX_ARGUMENT on real: 0 or π (AngleUnit.e from rad)
+                return x >= 0 ? 0 : fromRadians(Math.PI);
+            case "re":
+                return x;      // COMPLEX_REAL
+            case "im":
+                return 0.0;    // COMPLEX_IMAGINARY → 0 for real
+            case "conj":
+                return x;      // COMPLEX_CONJUGATE on real
+            default:
+                return null;
+        }
+    }
+
+    /** AngleUnit.n(): DEG=180, RAD=π, GRD=200 — convert display unit → radians. */
+    private double toRadians(double v) {
+        if ("DEG".equals(mAngleUnit)) return Math.toRadians(v);
+        if ("GRD".equals(mAngleUnit)) return v * Math.PI / 200.0;
+        return v; // RAD
+    }
+
+    /** Inverse: radians → current AngleUnit. */
+    private double fromRadians(double rad) {
+        if ("DEG".equals(mAngleUnit)) return Math.toDegrees(rad);
+        if ("GRD".equals(mAngleUnit)) return rad * 200.0 / Math.PI;
+        return rad;
+    }
+
+    private static double asinh(double x) { return Math.log(x + Math.sqrt(x * x + 1)); }
+    private static double acosh(double x) { return Math.log(x + Math.sqrt(x * x - 1)); }
+    private static double atanh(double x) { return 0.5 * Math.log((1 + x) / (1 - x)); }
+
+    /** Postfix ! ² and bare √x. */
+    private String evalPostfix(String expr) {
+        // factorial: digits!
+        while (true) {
+            int i = expr.lastIndexOf('!');
+            if (i <= 0) break;
+            int s = i - 1;
+            while (s >= 0 && (Character.isDigit(expr.charAt(s)) || expr.charAt(s) == '.')) s--;
+            s++;
+            if (s >= i) break;
+            double n = parseNumberOrFraction(expr.substring(s, i));
+            if (n < 0 || n != Math.floor(n) || n > 170) break;
+            long f = 1;
+            for (long k = 2; k <= (long) n; k++) f *= k;
+            expr = expr.substring(0, s) + f + expr.substring(i + 1);
+        }
+        return expr;
+    }
+
+    private String evalPowers(String expr) {
+        while (expr.contains("^")) {
+            int caretIdx = expr.indexOf('^');
+            int baseStart = caretIdx - 1;
+            while (baseStart >= 0 && (Character.isDigit(expr.charAt(baseStart)) || expr.charAt(baseStart) == '.' || expr.charAt(baseStart) == '-')) {
+                baseStart--;
+            }
+            baseStart++;
+            int expEnd = caretIdx + 1;
+            boolean neg = expEnd < expr.length() && expr.charAt(expEnd) == '-';
+            if (neg) expEnd++;
+            while (expEnd < expr.length() && (Character.isDigit(expr.charAt(expEnd)) || expr.charAt(expEnd) == '.')) expEnd++;
+            if (baseStart < caretIdx && expEnd > caretIdx + 1) {
+                double baseVal = Double.parseDouble(expr.substring(baseStart, caretIdx));
+                double expVal = Double.parseDouble(expr.substring(caretIdx + 1, expEnd));
+                expr = expr.substring(0, baseStart) + formatNumber(Math.pow(baseVal, expVal)) + expr.substring(expEnd);
+            } else {
+                break;
+            }
+        }
+        return expr;
+    }
+
+    /** `50%` → `0.5` (FloatingPoint PERCENT movePointLeft(2)). */
+    private String evalPercent(String expr) {
+        StringBuilder sb = new StringBuilder(expr);
+        int i = 0;
+        while (i < sb.length()) {
+            if (sb.charAt(i) == '%') {
+                int s = i - 1;
+                while (s >= 0 && (Character.isDigit(sb.charAt(s)) || sb.charAt(s) == '.')) s--;
+                s++;
+                if (s < i) {
+                    double v = Double.parseDouble(sb.substring(s, i));
+                    String rep = formatNumber(v / 100.0);
+                    sb.replace(s, i + 1, rep);
+                    i = s + rep.length();
+                    continue;
+                }
+            }
+            i++;
+        }
+        return sb.toString();
+    }
+
+    /** Word ops with surrounding spaces: mod, nPr, nCr, Δ% — left-to-right. */
+    private String evalWordOps(String expr) {
+        String[] ops = { " mod ", " nPr ", " nCr ", " Δ% " };
+        for (String op : ops) {
+            while (expr.contains(op)) {
+                int mid = expr.indexOf(op);
+                // left operand
+                int le = mid;
+                while (le > 0 && !isOpBoundary(expr.charAt(le - 1))) le--;
+                // right operand
+                int rs = mid + op.length();
+                int re = rs;
+                while (re < expr.length() && !isOpBoundary(expr.charAt(re))) re++;
+                if (le >= mid || rs >= re) break;
+                double a = parseNumberOrFraction(expr.substring(le, mid).trim());
+                double b = parseNumberOrFraction(expr.substring(rs, re).trim());
+                double r;
+                if (" mod ".equals(op)) r = (b != 0) ? Math.IEEEremainder(a, b) : Double.NaN;
+                else if (" nPr ".equals(op)) r = nPr((int) a, (int) b);
+                else if (" nCr ".equals(op)) r = nCr((int) a, (int) b);
+                else r = a * (b / 100.0); // Δ% rough: a * b%
+                String rep = formatNumber(r);
+                expr = expr.substring(0, le) + rep + expr.substring(re);
+            }
+        }
+        return expr;
+    }
+
+    private static boolean isOpBoundary(char c) {
+        return c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')';
+    }
+
+    private static double nPr(int n, int r) {
+        if (r < 0 || r > n) return Double.NaN;
+        double p = 1;
+        for (int i = 0; i < r; i++) p *= (n - i);
+        return p;
+    }
+
+    private static double nCr(int n, int r) {
+        if (r < 0 || r > n) return Double.NaN;
+        return nPr(n, r) / fact(r);
+    }
+
+    private static double fact(int n) {
+        double f = 1;
+        for (int i = 2; i <= n; i++) f *= i;
+        return f;
+    }
+
+    /**
+     * Display decoration — mirrors CalculatorCommand.C():
+     *   hyperbolic → equationStringStyled + "&lt;sup&gt;&lt;o&gt;h&lt;/o&gt;&lt;/sup&gt;"
+     *   else       → equationStringStyled + angleUnit.modifier  (d/r/g)
+     * T.a.b(str, mod) is plain concatenation after the function name.
+     * The "(" is a separate PARENTH_OPEN entry, so after formatEquation
+     * the text is "sin&lt;p&gt;(&lt;/p&gt;" — match after the name, not "sin(".
+     *
+     * @param plainCursor cursor index in pre-decoration plain text (from formatEquation)
+     * @param outCursor  [0] receives cursor index in post-decoration visible text
+     */
+    private String decorateAngleFunctions(String tagged, int plainCursor, int[] outCursor) {
+        if (outCursor != null && outCursor.length > 0) {
+            outCursor[0] = plainCursor;
+        }
+        if (tagged == null || tagged.isEmpty()) return tagged;
+        String sup;
+        if (mHyperbolic) {
+            sup = "<sup><o>h</o></sup>";
+        } else if ("DEG".equals(mAngleUnit)) {
+            sup = "<sup><o>d</o></sup>";
+        } else if ("RAD".equals(mAngleUnit)) {
+            sup = "<sup><o>r</o></sup>";
+        } else {
+            sup = "<sup><o>g</o></sup>";
+        }
+        // Visible chars inserted per decoration (tags stripped): "d"/"r"/"g"/"h"
+        final int visibleLen = 1;
+        int extraBeforeCursor = 0;
+        // Longest first so "asin" is not partially matched by "sin"
+        String[] fns = { "asin", "acos", "atan", "sin", "cos", "tan", "arg" };
+        for (String fn : fns) {
+            int idx = 0;
+            while (true) {
+                int i = tagged.indexOf(fn, idx);
+                if (i < 0) break;
+                if (i > 0 && Character.isLetterOrDigit(tagged.charAt(i - 1))) {
+                    idx = i + fn.length();
+                    continue;
+                }
+                int after = i + fn.length();
+                if (tagged.startsWith("<sup>", after)) {
+                    idx = after;
+                    continue;
+                }
+                if (after < tagged.length() && Character.isLetter(tagged.charAt(after))) {
+                    idx = after;
+                    continue;
+                }
+                // Count how many visible plain chars appear before this insert point
+                // (equals plain length of prefix up to `after`)
+                int plainBefore = stripTags(tagged.substring(0, after)).length();
+                if (plainBefore < plainCursor) {
+                    extraBeforeCursor += visibleLen;
+                }
+                tagged = tagged.substring(0, after) + sup + tagged.substring(after);
+                idx = after + sup.length();
+            }
+        }
+        if (outCursor != null && outCursor.length > 0) {
+            outCursor[0] = plainCursor + extraBeforeCursor;
+        }
+        return tagged;
+    }
+
+    /** Remove CalcTastic markup tags to get visible/plain length (q0.g / EquationPrintout). */
+    private static String stripTags(String s) {
+        return s.replaceAll("</?[^/<>]+>", "");
+    }
+
+    /** Back-compat: decorate without cursor adjustment (history path). */
+    private String decorateAngleFunctions(String tagged) {
+        return decorateAngleFunctions(tagged, Integer.MAX_VALUE, null);
     }
 
     private double parseNumberOrFraction(String token) {
@@ -464,8 +1392,11 @@ public class SimpleCalculatorActivity extends Activity {
                 NumberFormatHelper.FormattedResult formatted = 
                         NumberFormatHelper.formatEquation(mCurrentInput.toString(), mCursorIndex);
 
-                // Apply CalcSpannableFormatter to get colored operators and parentheses
-                SpannableStringBuilder coloredSpannable = CalcSpannableFormatter.format(formatted.taggedText);
+                // Decorate angle sup after formatEquation; adjust cursor for inserted visible chars
+                // (matches Equation.T: cursor after auto "(" → after "sin(" in display "sind(")
+                int[] decoratedCursor = { formatted.cursorPosition };
+                SpannableStringBuilder coloredSpannable = CalcSpannableFormatter.format(
+                        decorateAngleFunctions(formatted.taggedText, formatted.cursorPosition, decoratedCursor));
                 currentCalc.setText(coloredSpannable);
                 currentCalc.setCursorVisible(true);
 
@@ -478,8 +1409,8 @@ public class SimpleCalculatorActivity extends Activity {
                     currentCalc.setTextCursorDrawable(cursor);
                 }
 
-                if (formatted.cursorPosition <= coloredSpannable.length()) {
-                    currentCalc.setSelection(formatted.cursorPosition);
+                if (decoratedCursor[0] <= coloredSpannable.length()) {
+                    currentCalc.setSelection(decoratedCursor[0]);
                 }
 
                 currentCalc.post(() -> {
