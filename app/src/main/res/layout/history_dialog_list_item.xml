@@ -36,24 +36,62 @@
             android:maxLines="20"
             style="@style/CalcTastic.ListItemStyle.Description" />
 
-        <com.calctastic.sample.VerticalListEditText
-            android:id="@+id/current_calculation"
-            android:gravity="top|left"
-            android:longClickable="false"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:maxLines="20"
-            android:inputType="textNoSuggestions"
-            android:textSelectHandle="@drawable/zero_size_drawable"
-            android:textCursorDrawable="@drawable/cursor_drawable"
-            style="@style/CalcTastic.ListItemStyle.Description.Editable" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <com.calctastic.sample.VerticalListEditText
+                android:id="@+id/current_calculation"
+                android:gravity="top|left"
+                android:longClickable="false"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:maxLines="3"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:textSelectHandle="@drawable/zero_size_drawable"
+                android:textCursorDrawable="@drawable/cursor_drawable"
+                style="@style/CalcTastic.ListItemStyle.Description.Editable" />
+
+            <LinearLayout
+                android:id="@+id/chevron_container"
+                android:layout_width="32dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/btn_chevron_up"
+                    android:layout_width="32dp"
+                    android:layout_height="28dp"
+                    android:gravity="center"
+                    android:text="▲"
+                    android:textSize="12sp"
+                    android:textColor="#B0BEC5"
+                    android:background="?android:attr/selectableItemBackground" />
+
+                <TextView
+                    android:id="@+id/btn_chevron_down"
+                    android:layout_width="32dp"
+                    android:layout_height="28dp"
+                    android:gravity="center"
+                    android:text="▼"
+                    android:textSize="12sp"
+                    android:textColor="#B0BEC5"
+                    android:background="?android:attr/selectableItemBackground" />
+            </LinearLayout>
+        </LinearLayout>
 
         <com.calctastic.sample.VerticalListTextView
             android:id="@+id/history_result"
             android:gravity="center"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:maxLines="10"
+            android:maxLines="2"
+            android:ellipsize="end"
             style="@style/CalcTastic.ListItemStyle.Value" />
     </LinearLayout>
 </LinearLayout>

@@ -10,7 +10,10 @@ Dokumen ini mencatat pencapaian, komponen yang diimplementasikan, serta solusi t
 - **Struktur ListView Bawah-ke-Atas**: Menggunakan `ListView` dengan `stackFromBottom="true"` dan `transcriptMode="alwaysScroll"`, sesuai tata letak asli CalcTastic.
 - **Dua Jenis Baris Data**:
   - **Baris Riwayat (History Line)**: Menampilkan simbol operasi (`=`), ekspresi hitungan sebelumnya (`history_calculation`), dan hasil perhitungan (`history_result`).
-  - **Baris Aktif (Active Input Line)**: Menampilkan divider bar `▼ ON SCREEN ▼`, input kustom yang dapat diedit (`VerticalListEditText`), dan live preview hasil perhitungan.
+  - **Baris Aktif (Active Input Line)**: Menampilkan divider bar `▼ ON SCREEN ▼`, input kustom yang dapat diedit (`VerticalListEditText`), kontrol navigasi baris (chevron ▲/▼), dan live preview hasil perhitungan.
+- **Batasan Tampilan Baris & Truncation**:
+  - **Input Persamaan (Maksimal 3 Baris)**: Otomatis membungkus teks hingga 3 baris. Jika rumus melebihi 3 baris, tombol chevron navigasi baris (`▲` dan `▼`) otomatis muncul di sisi kanan baris input untuk berpindah baris.
+  - **Hasil Perhitungan (Maksimal 2 Baris)**: Ditampilkan maksimal 2 baris (`maxLines="2"`), dan jika hasil sangat panjang akan di-truncate dengan elipsis (`...`) di akhir baris kedua (`ellipsize="end"`).
 - **Tipografi & Font Asli**:
   - `font_inter_medium.ttf`: Digunakan untuk simbol, label, divider bar, dan tombol fungsi.
   - `font_roboto_mono_variable.ttf`: Digunakan untuk digit angka persamaan dan hasil hitungan.

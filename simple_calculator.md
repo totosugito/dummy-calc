@@ -38,8 +38,10 @@ Setiap baris di dalam `ListView` menggunakan layout [`history_dialog_list_item.x
 ### Komponen Tampilan Baris:
 - **`history_symbol`**: Menampilkan simbol `=` untuk menandai baris riwayat yang telah selesai dihitung.
 - **`history_divider`**: Label teks `▼ ON SCREEN ▼` menggunakan font `font_inter_medium.ttf` dengan warna `#B0BEC5` untuk memisahkan riwayat lampau dengan kalkulasi yang sedang diketik.
-- **`history_calculation` & `history_result`**: `TextView` untuk riwayat selesai.
-- **`current_calculation`**: Komponen kustom [`VerticalListEditText.java`](file:///home/toto/Downloads/decompile/calctastic/sample_app/app/src/main/java/com/calctastic/sample/VerticalListEditText.java) yang mendukung interaksi sentuh mandiri, navigasi kursor, dan pewarnaan markup.
+- **`history_calculation`**: `TextView` untuk ekspresi riwayat yang telah selesai.
+- **`current_calculation`**: Komponen kustom [`VerticalListEditText.java`](file:///home/toto/Downloads/decompile/calctastic/sample_app/app/src/main/java/com/calctastic/sample/VerticalListEditText.java) yang mendukung interaksi sentuh mandiri, navigasi kursor, dan pewarnaan markup. Dibatasi **maksimal 3 baris** (`maxLines="3"`).
+- **`chevron_container` (`btn_chevron_up` & `btn_chevron_down`)**: Kontrol navigasi vertikal antar-baris (▲ / ▼) yang terletak di sisi kanan input. Hanya muncul otomatis ketika teks melebihi 3 baris. Memungkinkan pengguna berpindah baris secara instan dan memperbarui posisi kursor.
+- **`history_result`**: `TextView` hasil kalkulasi. Dibatasi **maksimal 2 baris** (`maxLines="2"`) dengan pemotongan otomatis tanda elipsis (`ellipsize="end"`) jika digit hasil melebihi 2 baris.
 
 ---
 

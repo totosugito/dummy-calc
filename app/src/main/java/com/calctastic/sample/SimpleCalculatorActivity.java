@@ -6,6 +6,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -56,6 +57,11 @@ public class SimpleCalculatorActivity extends Activity {
         String hist2Expr = NumberFormatHelper.formatEquation("√(144000) + 2500.75", 0).taggedText;
         String hist2Res = NumberFormatHelper.formatEquation("2879.41", 0).taggedText;
         mHistory.add(new HistoryEntry(hist2Expr, hist2Res, "="));
+
+        // Test entry with very long multi-line result (exceeding 2 lines)
+        String longTestExpr = "Test Multi-Line Long Result";
+        String longTestRes = "111,222,333,444,555,666,777,888,999,000,111,222,333,444,555,666,777,888,999";
+        mHistory.add(new HistoryEntry(longTestExpr, longTestRes, "="));
 
         setupKeypad();
         updateDisplay();
@@ -227,20 +233,34 @@ public class SimpleCalculatorActivity extends Activity {
         // Equals
         Button btnEquals = findViewById(R.id.btn_equals);
         if (btnEquals != null) {
-            btnEquals.setOnClickListener(v -> {
-                if (mCurrentInput.length() > 0) {
-                    String res = evaluateExpression(mCurrentInput.toString());
-                    String formattedInput = NumberFormatHelper.formatEquation(mCurrentInput.toString().trim(), 0).taggedText;
-                    String formattedRes = NumberFormatHelper.formatEquation(res, 0).taggedText;
-                    mHistory.add(new HistoryEntry(formattedInput, formattedRes, "="));
-                    mCurrentInput.setLength(0);
-                    mCursorIndex = 0;
-                    mLiveResult = "";
-                    updateDisplay();
-                    mListView.setSelection(mAdapter.getCount() - 1);
-                }
-            });
+            btnEquals.setOnClickListener(v -> performEqualsCalculation());
         }
+    }
+
+    private void performEqualsCalculation() {
+        if (mCurrentInput.length() > 0) {
+            String res = evaluateExpression(mCurrentInput.toString());
+            String formattedInput = NumberFormatHelper.formatEquation(mCurrentInput.toString().trim(), 0).taggedText;
+            String formattedRes = NumberFormatHelper.formatEquation(res, 0).taggedText;
+            mHistory.add(new HistoryEntry(formattedInput, formattedRes, "="));
+            mCurrentInput.setLength(0);
+            mCursorIndex = 0;
+            mLiveResult = "";
+            updateDisplay();
+            mListView.setSelection(mAdapter.getCount() - 1);
+        }
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            int keyCode = event.getKeyCode();
+            if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER || keyCode == KeyEvent.KEYCODE_EQUALS) {
+                performEqualsCalculation();
+                return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     private void insertText(String text) {
@@ -425,6 +445,10 @@ public class SimpleCalculatorActivity extends Activity {
 
             boolean isActiveLine = (position == mHistory.size());
 
+            View chevronContainer = view.findViewById(R.id.chevron_container);
+            TextView btnChevronUp = view.findViewById(R.id.btn_chevron_up);
+            TextView btnChevronDown = view.findViewById(R.id.btn_chevron_down);
+
             if (isActiveLine) {
                 dividerView.setVisibility(View.VISIBLE);
                 historyCalc.setVisibility(View.GONE);
@@ -454,7 +478,75 @@ public class SimpleCalculatorActivity extends Activity {
 
                 currentCalc.post(() -> {
                     currentCalc.requestFocus();
+                    android.text.Layout layout = currentCalc.getLayout();
+                    if (layout != null) {
+                        int lineCount = layout.getLineCount();
+                        int totalLines = lineCount;
+                        if (currentCalc.getWidth() > 0) {
+                            int availWidth = currentCalc.getWidth() - currentCalc.getPaddingLeft() - currentCalc.getPaddingRight();
+                            if (availWidth > 0) {
+                                android.text.StaticLayout sl = new android.text.StaticLayout(
+                                        coloredSpannable,
+                                        currentCalc.getPaint(),
+                                        availWidth,
+                                        android.text.Layout.Alignment.ALIGN_NORMAL,
+                                        1.0f, 0.0f, false
+                                );
+                                totalLines = Math.max(totalLines, sl.getLineCount());
+                            }
+                        }
+
+                        if (totalLines > 3) {
+                            chevronContainer.setVisibility(View.VISIBLE);
+                            int curLine = layout.getLineForOffset(currentCalc.getSelectionStart());
+                            btnChevronUp.setAlpha(curLine > 0 ? 1.0f : 0.3f);
+                            btnChevronDown.setAlpha(curLine < totalLines - 1 ? 1.0f : 0.3f);
+                        } else {
+                            chevronContainer.setVisibility(View.GONE);
+                        }
+                    } else {
+                        chevronContainer.setVisibility(View.GONE);
+                    }
                 });
+
+                if (btnChevronUp != null) {
+                    btnChevronUp.setOnClickListener(v -> {
+                        android.text.Layout layout = currentCalc.getLayout();
+                        if (layout != null) {
+                            int curLine = layout.getLineForOffset(currentCalc.getSelectionStart());
+                            if (curLine > 0) {
+                                int targetLine = curLine - 1;
+                                float x = layout.getPrimaryHorizontal(currentCalc.getSelectionStart());
+                                int newFormattedOffset = layout.getOffsetForHorizontal(targetLine, x);
+                                int rawIdx = NumberFormatHelper.mapOffsetToRawIndex(formatted.printedSizes, newFormattedOffset);
+                                if (rawIdx >= 0 && rawIdx <= mCurrentInput.length()) {
+                                    mCursorIndex = rawIdx;
+                                    updateDisplay();
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (btnChevronDown != null) {
+                    btnChevronDown.setOnClickListener(v -> {
+                        android.text.Layout layout = currentCalc.getLayout();
+                        if (layout != null) {
+                            int lineCount = layout.getLineCount();
+                            int curLine = layout.getLineForOffset(currentCalc.getSelectionStart());
+                            if (curLine < lineCount - 1) {
+                                int targetLine = curLine + 1;
+                                float x = layout.getPrimaryHorizontal(currentCalc.getSelectionStart());
+                                int newFormattedOffset = layout.getOffsetForHorizontal(targetLine, x);
+                                int rawIdx = NumberFormatHelper.mapOffsetToRawIndex(formatted.printedSizes, newFormattedOffset);
+                                if (rawIdx >= 0 && rawIdx <= mCurrentInput.length()) {
+                                    mCursorIndex = rawIdx;
+                                    updateDisplay();
+                                }
+                            }
+                        }
+                    });
+                }
 
                 // Tap to reposition cursor, mapped via printed sizes
                 currentCalc.setOnTouchListener((v, event) -> {
@@ -474,6 +566,7 @@ public class SimpleCalculatorActivity extends Activity {
             } else {
                 dividerView.setVisibility(View.GONE);
                 currentCalc.setVisibility(View.GONE);
+                chevronContainer.setVisibility(View.GONE);
                 historyCalc.setVisibility(View.VISIBLE);
 
                 HistoryEntry entry = mHistory.get(position);
