@@ -62,8 +62,11 @@ Keypad disusun persis mengikuti konfigurasi layout `keyboard_portrait_simple.xml
 
 | File | Deskripsi |
 | :--- | :--- |
-| `SimpleCalculatorActivity.java` | Logika controller utama, interaksi tombol, parser perhitungan, adapter riwayat hitungan. |
-| `VerticalListEditText.java` | Komponen EditText turunan yang menangani input teks kalkulator, kedipan kursor, dan kontrol sentuhan tanpa soft keyboard. |
+| `SimpleCalculatorActivity.java` | Controller UI: lifecycle, wiring tombol simple/scientific, insert/backspace, adapter riwayat. |
+| `ExpressionEvaluator.java` | Mesin evaluasi ekspresi (fungsi trig/ln/log, sudut DEG/RAD/GRD, HYP, `!` `%` `mod` `nPr`…). |
+| `ExpressionDecorator.java` | Superskrip sudut `d`/`r`/`g`/`h` pada nama fungsi di tampilan ekspresi (setara `CalculatorCommand.C`). |
+| `CalculatorMemory.java` | Reg memori 0: save / recall / M+ / M− / MC (setara `CalcMemory` + `Calculator` case 44–49). |
+| `CalcTokens.java` | Tabel token: auto-paren fungsi (ordinal 68–86), operator multi-char, postfix. |
 | `NumberFormatHelper.java` | Engine pemformat digit ribuan, mapping indeks kursor layar, serta penyusunan tag pecahan (`sup`, `sf`, `hw`, `dim`). |
 | `CalcSpannableFormatter.java` | Parser markup XML mini ke Android `SpannableStringBuilder` untuk pewarnaan operator, kurung, dan styling pecahan. |
 | `CalcTypefaceHelper.java` | Pengelola font kustom (Inter Medium, Roboto Mono). |
