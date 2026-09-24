@@ -89,7 +89,69 @@ public class SimpleCalculatorActivity extends Activity {
         setupModeToggle();
         setupKeypad();
         setupScientificKeypad();
+        applyKeypadFonts();
         updateDisplay();
+    }
+
+    /**
+     * Per-button typefaces from CalculatorCommand.keyboardFont (f.java:31–41):
+     * MONO1=roboto_mono, SANS1=inter_medium, SANS2=inter_regular,
+     * SERI1=stix_two, SERI2=hepta_slab.
+     */
+    private void applyKeypadFonts() {
+        // MONO1 — ( ) i
+        applyFont(R.id.sci_paren_open, "MONO1");
+        applyFont(R.id.sci_paren_close, "MONO1");
+        applyFont(R.id.sci_i, "MONO1");
+        applyFont(R.id.btn_paren_open, "MONO1");
+        applyFont(R.id.btn_paren_close, "MONO1");
+
+        // SANS2 — digits
+        int[] digits = {
+            R.id.sci_0, R.id.sci_1, R.id.sci_2, R.id.sci_3, R.id.sci_4,
+            R.id.sci_5, R.id.sci_6, R.id.sci_7, R.id.sci_8, R.id.sci_9,
+            R.id.btn_0, R.id.btn_1, R.id.btn_2, R.id.btn_3, R.id.btn_4,
+            R.id.btn_5, R.id.btn_6, R.id.btn_7, R.id.btn_8, R.id.btn_9
+        };
+        for (int id : digits) applyFont(id, "SANS2");
+
+        // SERI1 — π ± + − × ÷ =
+        int[] serOp = {
+            R.id.sci_pi, R.id.sci_negate, R.id.sci_add, R.id.sci_sub,
+            R.id.sci_mul, R.id.sci_div, R.id.sci_equals,
+            R.id.btn_negate, R.id.btn_add, R.id.btn_sub, R.id.btn_mul,
+            R.id.btn_div, R.id.btn_equals
+        };
+        for (int id : serOp) applyFont(id, "SERI1");
+
+        // SERI2 — a/b x² yˣ 1/x √ .
+        int[] serSlab = {
+            R.id.sci_fraction, R.id.sci_square, R.id.sci_power,
+            R.id.sci_reciprocal, R.id.sci_dot,
+            R.id.btn_fraction, R.id.btn_sqrt, R.id.btn_square,
+            R.id.btn_power, R.id.btn_reciprocal, R.id.btn_dot
+        };
+        for (int id : serSlab) applyFont(id, "SERI2");
+
+        // SANS1 — function/control labels
+        int[] sans1 = {
+            R.id.sci_shift, R.id.sci_drg, R.id.sci_fse, R.id.sci_ms, R.id.sci_mr,
+            R.id.sci_sin, R.id.sci_cos, R.id.sci_tan, R.id.sci_ln, R.id.sci_log,
+            R.id.sci_percent, R.id.sci_delete, R.id.sci_clear, R.id.sci_eex,
+            R.id.sci_cursor_left, R.id.sci_cursor_right,
+            R.id.btn_percent, R.id.btn_delete, R.id.btn_clear,
+            R.id.btn_cursor_left, R.id.btn_cursor_right,
+            R.id.btn_mem_plus, R.id.btn_mem_minus, R.id.btn_mem_clear,
+            R.id.btn_mem_save, R.id.btn_mem_recall
+        };
+        for (int id : sans1) applyFont(id, "SANS1");
+    }
+
+    private void applyFont(int viewId, String fontId) {
+        View v = findViewById(viewId);
+        if (v instanceof android.widget.TextView) {
+            CalcTypefaceHelper.applyFontId((android.widget.TextView) v, fontId, 0);
+        }
     }
 
     private void setupModeToggle() {

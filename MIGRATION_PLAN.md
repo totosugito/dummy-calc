@@ -131,13 +131,13 @@ Centang item saat selesai diimplementasi **dan** diverifikasi.
 
 | Status | Font id | Font | Dipakai untuk |
 | :---: | --- | --- | --- |
-| [ ] | SANS1 | font_inter_medium | label fungsi, operator teks |
-| [ ] | SANS2 | font_inter_regular | digit |
-| [ ] | MONO1 | font_roboto_mono_variable | `i` `(` `)` |
-| [ ] | SERI1 | font_stix_two_text_medium | `=` `π` `±` `+ − × ÷` |
-| [ ] | SERI2 | font_hepta_slab_medium | `a/b` `x²` `yˣ` `1/x` `√` `.` |
+| [x] | SANS1 | font_inter_medium | label fungsi, operator teks |
+| [x] | SANS2 | font_inter_regular | digit |
+| [x] | MONO1 | font_roboto_mono_variable | `i` `(` `)` |
+| [x] | SERI1 | font_stix_two_text_medium | `=` `π` `±` `+ − × ÷` |
+| [x] | SERI2 | font_hepta_slab_medium | `a/b` `x²` `yˣ` `1/x` `√` `.` |
 
-Saat ini sample memakai `CalcSimpleButton.*` umum (inter medium).
+Diterapkan via `CalcTypefaceHelper.applyFontId` + `SimpleCalculatorActivity.applyKeypadFonts()` (panggilan di `onCreate` setelah wiring). Mapping id→font dari `CalculatorCommand.keyboardFont` / `f.java:31–41`.
 
 ---
 
@@ -170,6 +170,7 @@ Saat ini sample memakai `CalcSimpleButton.*` umum (inter medium).
 | 2026-09-24 | Fix | **Superskrip + kursor** — decorate setelah formatEquation (cari nama fn, bukan `sin(`); kursor disesuaikan +char sup; `evaluateLive` skip ekspresi belum lengkap. Verif PASS 4/4: `sin`+`5`→`sind(5` |
 | 2026-09-24 | Refactor | **Split file** — Activity 1520→931; baru `ExpressionEvaluator` (454), `ExpressionDecorator` (86), `CalculatorMemory` (52), `CalcTokens` (47). Smoke PASS 4/4 |
 | 2026-09-24 | Refactor | **Sub-package** — `expression/` (eval+format), `memory/`, `ui/` (widgets+font); Activity tetap root. Layout XML class refs updated. Smoke PASS 5/5 |
+| 2026-09-24 | Batch 7 | **Font per-command** — SANS1/2 MONO1 SERI1/2 via `applyKeypadFonts()`; mapping dari `keyboardFont` + `f.java`. Build OK |
 
 ---
 
