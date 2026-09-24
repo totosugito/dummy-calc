@@ -861,19 +861,24 @@ public class SimpleCalculatorActivity extends Activity {
         });
     }
 
-    /** Shift a/b — DMS convert current expression (AlgebraicInputHandler case 103). */
+    /**
+     * Shift a/b — DMS on trailing operand only (AlgebraicInputHandler case 103:
+     * equation.a() result or equation.M() last entry — NOT whole string).
+     * Allows: 5→DMS, + 80→DMS independently in one expression.
+     */
     private void convertCurrentToDms() {
-        String dms = DmsHelper.tryConvert(mCurrentInput.toString());
-        if (dms != null) {
+        String full = mCurrentInput.toString();
+        int end = Math.min(Math.max(mCursorIndex, 0), full.length());
+        String updated = DmsHelper.convertTrailing(full, end);
+        if (updated != null) {
+            int delta = updated.length() - full.length();
             mCurrentInput.setLength(0);
-            mCurrentInput.append(dms);
-            mCursorIndex = mCurrentInput.length();
+            mCurrentInput.append(updated);
+            mCursorIndex = Math.min(end + delta, updated.length());
             evaluateLive();
             updateDisplay();
-        } else {
-            // Fallback: append ° marker if not pure number
-            insertText("°");
         }
+        // null → no trailing numeric operand (original returns without change)
     }
 
     private void evaluateLive() {
