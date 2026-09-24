@@ -97,17 +97,44 @@ public class ExpressionEvaluator {
                 return formatNumber(v);
             }
             if (tokens.length >= 3) {
+                boolean leftDms = isDmsToken(tokens[0]);
                 double a = parseNumberOrFraction(tokens[0]);
                 int idx = 1;
+                String lastOp = null;
+                boolean anyDms = leftDms;
                 while (idx + 1 < tokens.length) {
                     String op = tokens[idx];
+                    boolean rightDms = isDmsToken(tokens[idx + 1]);
                     double b = parseNumberOrFraction(tokens[idx + 1]);
                     if ("+".equals(op)) a = a + b;
                     else if ("-".equals(op)) a = a - b;
                     else if ("*".equals(op)) a = a * b;
                     else if ("/".equals(op)) a = (b != 0) ? a / b : Double.NaN;
                     else if ("^".equals(op)) a = Math.pow(a, b);
+                    anyDms = anyDms || rightDms;
+                    lastOp = op;
                     idx += 2;
+                }
+                // DegreeMinuteSecond.f/g: × + − wrap result as DMS when either side is DMS;
+                // ÷ wraps only when DMS is on the right (g case 56), plain when DMS on left (f case 56)
+                if (anyDms && lastOp != null) {
+                    boolean wrap;
+                    if ("*".equals(lastOp) || "+".equals(lastOp) || "-".equals(lastOp)) {
+                        wrap = true;
+                    } else if ("/".equals(lastOp)) {
+                        wrap = leftDms; // f: DMS÷n → plain; g: n÷DMS → DMS. lastOp / with left DMS → plain
+                        // Actually lastOp only tracks last op; for single-op expressions:
+                        wrap = !leftDms; // DMS on left only → plain (f); DMS was on right → wrap (g)
+                        // Re-evaluate: if original left was DMS and single ÷, f returns plain
+                        wrap = !leftDms || !anyDms;
+                        // Simpler per original for common case:
+                        wrap = !leftDms; // if left wasn't DMS, right was → g wraps; if left was DMS → f plain
+                    } else {
+                        wrap = false; // ^ etc. return plain
+                    }
+                    if (wrap) {
+                        return formatAsDms(a);
+                    }
                 }
                 return formatNumber(a);
             }
@@ -435,8 +462,17 @@ public class ExpressionEvaluator {
     }
 
     double parseNumberOrFraction(String token) {
-        if (token.contains("/")) {
-            String[] parts = token.split("/");
+        String t = token.trim();
+        // DMS operand: "7°", "7°9'", "30°30'0\"" → decimal degrees (DegreeMinuteSecond.Z)
+        if (t.indexOf('°') >= 0 || t.indexOf('\'') >= 0 || t.indexOf('"') >= 0) {
+            try {
+                return DegreeMinuteSecond.Z(t, false).getDegreesOnly().doubleValue();
+            } catch (RuntimeException e) {
+                // fall through
+            }
+        }
+        if (t.contains("/")) {
+            String[] parts = t.split("/");
             if (parts.length == 2) {
                 double n = Double.parseDouble(parts[0]);
                 double d = Double.parseDouble(parts[1]);
@@ -448,7 +484,26 @@ public class ExpressionEvaluator {
                 return d != 0 ? w + (n / d) : 0;
             }
         }
-        return Double.parseDouble(token);
+        return Double.parseDouble(t);
+    }
+
+    static boolean isDmsToken(String token) {
+        if (token == null) return false;
+        String t = token.trim();
+        return t.indexOf('°') >= 0 || t.indexOf('\'') >= 0 || t.indexOf('"') >= 0;
+    }
+
+    /**
+     * Wrap decimal degrees as DMS display — DegreeMinuteSecond.f/g:
+     * new DegreeMinuteSecond(FloatingPoint result) then Y().
+     */
+    static String formatAsDms(double degrees) {
+        try {
+            return new DegreeMinuteSecond(
+                    new java.math.BigDecimal(Double.toString(degrees)), null, false).Y();
+        } catch (RuntimeException e) {
+            return formatNumber(degrees);
+        }
     }
 
 }
