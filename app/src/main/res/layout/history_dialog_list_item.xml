@@ -1,22 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal"
+    android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:baselineAligned="false">
-
-    <com.calctastic.sample.VerticalListTextView
-        android:id="@+id/history_symbol"
-        android:gravity="center"
-        android:layout_width="40dp"
-        android:layout_height="match_parent"
-        style="@style/CalcTastic.SymbolItemStyle" />
-
-    <LinearLayout
-        android:orientation="vertical"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:baselineAligned="false">
 
         <com.calctastic.sample.VerticalListTextView
             android:id="@+id/history_divider"
@@ -30,13 +17,26 @@
 
         <com.calctastic.sample.VerticalListTextView
             android:id="@+id/history_calculation"
-            android:gravity="top|left"
+            android:gravity="left|center_vertical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:maxLines="20"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:ellipsize="end"
             style="@style/CalcTastic.ListItemStyle.Description" />
 
+        <com.calctastic.sample.VerticalListTextView
+            android:id="@+id/history_result"
+            android:gravity="right|center_vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:singleLine="true"
+            android:ellipsize="end"
+            style="@style/CalcTastic.ListItemStyle.Value" />
+
         <LinearLayout
+            android:id="@+id/active_calculation_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -86,12 +86,11 @@
         </LinearLayout>
 
         <com.calctastic.sample.VerticalListTextView
-            android:id="@+id/history_result"
+            android:id="@+id/active_live_result"
             android:gravity="center"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:maxLines="2"
             android:ellipsize="end"
             style="@style/CalcTastic.ListItemStyle.Value" />
-    </LinearLayout>
 </LinearLayout>

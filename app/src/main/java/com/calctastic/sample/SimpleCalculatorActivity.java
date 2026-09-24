@@ -58,10 +58,13 @@ public class SimpleCalculatorActivity extends Activity {
         String hist2Res = NumberFormatHelper.formatEquation("2879.41", 0).taggedText;
         mHistory.add(new HistoryEntry(hist2Expr, hist2Res, "="));
 
-        // Test entry with very long multi-line result (exceeding 2 lines)
-        String longTestExpr = "Test Multi-Line Long Result";
-        String longTestRes = "111,222,333,444,555,666,777,888,999,000,111,222,333,444,555,666,777,888,999";
-        mHistory.add(new HistoryEntry(longTestExpr, longTestRes, "="));
+        String hist3Expr = NumberFormatHelper.formatEquation("987654 / 3", 0).taggedText;
+        String hist3Res = NumberFormatHelper.formatEquation("329218", 0).taggedText;
+        mHistory.add(new HistoryEntry(hist3Expr, hist3Res, "="));
+
+        String hist4Expr = NumberFormatHelper.formatEquation("123456789 + 987654321 × 111222333 + 444555666", 0).taggedText;
+        String hist4Res = "111,222,333,444,555,666,777,888,999,000,111,222,333";
+        mHistory.add(new HistoryEntry(hist4Expr, hist4Res, "="));
 
         setupKeypad();
         updateDisplay();
@@ -431,17 +434,18 @@ public class SimpleCalculatorActivity extends Activity {
                         .inflate(R.layout.history_dialog_list_item, parent, false);
             }
 
-            TextView symbolView = view.findViewById(R.id.history_symbol);
             TextView dividerView = view.findViewById(R.id.history_divider);
             TextView historyCalc = view.findViewById(R.id.history_calculation);
+            TextView historyResult = view.findViewById(R.id.history_result);
+            View activeCalcContainer = view.findViewById(R.id.active_calculation_container);
             VerticalListEditText currentCalc = view.findViewById(R.id.current_calculation);
-            TextView resultView = view.findViewById(R.id.history_result);
+            TextView activeLiveResult = view.findViewById(R.id.active_live_result);
 
-            symbolView.setTypeface(CalcTypefaceHelper.getSymbolAndLabelFont(parent.getContext()));
             dividerView.setTypeface(CalcTypefaceHelper.getSymbolAndLabelFont(parent.getContext()));
             historyCalc.setTypeface(CalcTypefaceHelper.getScreenCalculationFont(parent.getContext()));
+            historyResult.setTypeface(CalcTypefaceHelper.getScreenCalculationFont(parent.getContext()));
             currentCalc.setTypeface(CalcTypefaceHelper.getScreenCalculationFont(parent.getContext()));
-            resultView.setTypeface(CalcTypefaceHelper.getScreenCalculationFont(parent.getContext()));
+            activeLiveResult.setTypeface(CalcTypefaceHelper.getScreenCalculationFont(parent.getContext()));
 
             boolean isActiveLine = (position == mHistory.size());
 
@@ -452,7 +456,9 @@ public class SimpleCalculatorActivity extends Activity {
             if (isActiveLine) {
                 dividerView.setVisibility(View.VISIBLE);
                 historyCalc.setVisibility(View.GONE);
-                currentCalc.setVisibility(View.VISIBLE);
+                historyResult.setVisibility(View.GONE);
+                activeCalcContainer.setVisibility(View.VISIBLE);
+                activeLiveResult.setVisibility(View.VISIBLE);
 
                 // Format live expression with thousand and decimal separators, plus colored symbols
                 NumberFormatHelper.FormattedResult formatted = 
@@ -562,17 +568,18 @@ public class SimpleCalculatorActivity extends Activity {
                     return true;
                 });
 
-                resultView.setText(CalcSpannableFormatter.format(mLiveResult));
+                activeLiveResult.setText(CalcSpannableFormatter.format(mLiveResult));
             } else {
                 dividerView.setVisibility(View.GONE);
-                currentCalc.setVisibility(View.GONE);
+                activeCalcContainer.setVisibility(View.GONE);
+                activeLiveResult.setVisibility(View.GONE);
                 chevronContainer.setVisibility(View.GONE);
                 historyCalc.setVisibility(View.VISIBLE);
+                historyResult.setVisibility(View.VISIBLE);
 
                 HistoryEntry entry = mHistory.get(position);
-                symbolView.setText(entry.symbol);
                 historyCalc.setText(CalcSpannableFormatter.format(entry.expression));
-                resultView.setText(CalcSpannableFormatter.format(entry.result));
+                historyResult.setText(CalcSpannableFormatter.format("= " + entry.result));
                 currentCalc.setOnTouchListener(null);
             }
 
