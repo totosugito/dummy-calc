@@ -13,8 +13,12 @@
 
     <style name="CalcTastic.ScreenListViewStyle">
         <item name="android:choiceMode">none</item>
-        <item name="android:divider">@null</item>
-        <item name="android:dividerHeight">0dp</item>
+        <item name="android:divider">#3A3A3A</item>
+        <item name="android:dividerHeight">0.5dp</item>
+        <item name="android:listSelector">@android:color/transparent</item>
+        <item name="android:cacheColorHint">@android:color/transparent</item>
+        <item name="android:fadingEdge">none</item>
+        <item name="android:hapticFeedbackEnabled">false</item>
     </style>
 
     <style name="CalcTastic.ListItemStyle">
@@ -27,7 +31,7 @@
         <item name="android:paddingRight">24dp</item>
         <item name="android:fontFamily">@font/font_roboto_mono_variable</item>
         <item name="android:textColor">#FFFFFF</item>
-        <item name="android:textSize">17sp</item>
+        <item name="android:includeFontPadding">false</item>
     </style>
 
     <style name="CalcTastic.ListItemStyle.Description.Editable" parent="CalcTastic.ListItemStyle.Description">
@@ -35,8 +39,8 @@
         <item name="android:background">@android:color/transparent</item>
         <item name="android:fontFamily">@font/font_roboto_mono_variable</item>
         <item name="android:textColor">#EEEEEE</item>
-        <item name="android:textSize">22sp</item>
         <item name="android:minHeight">36dp</item>
+        <item name="android:includeFontPadding">false</item>
         <item name="android:textCursorDrawable">@drawable/cursor_drawable</item>
         <item name="android:cursorVisible">true</item>
     </style>
@@ -47,7 +51,7 @@
         <item name="android:paddingRight">5dp</item>
         <item name="android:fontFamily">@font/font_roboto_mono_variable</item>
         <item name="android:textColor">#4CAF50</item>
-        <item name="android:textSize">18sp</item>
+        <item name="android:includeFontPadding">false</item>
     </style>
 
     <style name="CalcTastic.SymbolItemStyle" parent="CalcTastic.ListItemStyle">
@@ -109,12 +113,13 @@
     <style name="CalcSimpleButton.ShiftLabel">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:minHeight">14dp</item>
         <item name="android:layout_margin">0dp</item>
-        <item name="android:textSize">9sp</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <item name="android:textSize">11sp</item>
         <item name="android:textColor">#FF9800</item>
         <item name="android:fontFamily">@font/font_inter_medium</item>
-        <item name="android:gravity">center</item>
+        <item name="android:gravity">bottom|center_horizontal</item>
         <item name="android:background">@android:color/transparent</item>
         <item name="android:singleLine">true</item>
     </style>

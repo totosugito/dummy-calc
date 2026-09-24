@@ -21,6 +21,7 @@ import com.calctastic.sample.expression.ExpressionDecorator;
 import com.calctastic.sample.expression.ExpressionEvaluator;
 import com.calctastic.sample.expression.NumberFormatHelper;
 import com.calctastic.sample.memory.CalculatorMemory;
+import com.calctastic.sample.ui.CalcFontSizeHelper;
 import com.calctastic.sample.ui.CalcTypefaceHelper;
 import com.calctastic.sample.ui.VerticalListEditText;
 import java.util.ArrayList;
@@ -856,6 +857,15 @@ public class SimpleCalculatorActivity extends Activity {
             currentCalc.setTypeface(CalcTypefaceHelper.getScreenCalculationFont(parent.getContext()));
             activeLiveResult.setTypeface(CalcTypefaceHelper.getScreenCalculationFont(parent.getContext()));
 
+            // Dynamic sizes — FONTSIZE_LIST_DESCRIPTION_HISTORY vs FONTSIZE_LIST_STACK (p018j0/b.java)
+            float exprSp = CalcFontSizeHelper.expressionSp(parent.getContext());
+            float resultSp = CalcFontSizeHelper.resultSp(parent.getContext());
+            historyCalc.setTextSize(exprSp);
+            currentCalc.setTextSize(exprSp);
+            historyResult.setTextSize(resultSp);
+            activeLiveResult.setTextSize(resultSp);
+            dividerView.setTextSize(12f);
+
             boolean isActiveLine = (position == mHistory.size());
 
             View chevronContainer = view.findViewById(R.id.chevron_container);
@@ -991,7 +1001,15 @@ public class SimpleCalculatorActivity extends Activity {
 
                 HistoryEntry entry = mHistory.get(position);
                 historyCalc.setText(CalcSpannableFormatter.format(entry.expression));
-                historyResult.setText(CalcSpannableFormatter.format("= " + entry.result));
+                SpannableStringBuilder resultSsb = CalcSpannableFormatter.format("= " + entry.result);
+                // "=" prefix → default white, not green result color
+                if (resultSsb.length() > 0 && resultSsb.charAt(0) == '=') {
+                    resultSsb.setSpan(
+                            new android.text.style.ForegroundColorSpan(Color.WHITE),
+                            0, 1,
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
+                historyResult.setText(resultSsb);
                 currentCalc.setOnTouchListener(null);
             }
 

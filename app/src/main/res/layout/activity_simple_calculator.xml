@@ -19,8 +19,8 @@
             android:layout_height="match_parent"
             android:stackFromBottom="true"
             android:transcriptMode="alwaysScroll"
-            android:divider="@null"
-            android:dividerHeight="0dp"
+            android:divider="#3A3A3A"
+            android:dividerHeight="0.5dp"
             android:choiceMode="none"
             android:focusable="false"
             android:descendantFocusability="afterDescendants"
@@ -268,8 +268,7 @@
         <!-- Row 1 shift labels: —, ∠, HYP, PREC, —, — -->
         <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.35">
+            android:layout_height="wrap_content">
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="∠" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="HYP" />
@@ -294,8 +293,7 @@
         <!-- Row 2 shift labels -->
         <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.35">
+            android:layout_height="wrap_content">
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="D°M'S&quot;" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="asin" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="acos" />
@@ -320,8 +318,7 @@
         <!-- Row 3 shift labels -->
         <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.35">
+            android:layout_height="wrap_content">
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="e" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="eˣ" />
@@ -346,8 +343,7 @@
         <!-- Row 4 shift labels -->
         <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.35">
+            android:layout_height="wrap_content">
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="√x" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Ceil" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Re" />
@@ -372,8 +368,7 @@
         <!-- Row 5 shift labels -->
         <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.35">
+            android:layout_height="wrap_content">
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="ˣ√y" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Floor" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Abs" />
@@ -398,8 +393,7 @@
         <!-- Row 6 shift labels -->
         <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.35">
+            android:layout_height="wrap_content">
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="Δ%" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="x!" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="nPr" />
@@ -424,8 +418,7 @@
         <!-- Row 7 shift labels -->
         <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_weight="0.35">
+            android:layout_height="wrap_content">
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="CONST" />
             <TextView style="@style/CalcSimpleButton.ShiftLabel" android:text="CONV" />
