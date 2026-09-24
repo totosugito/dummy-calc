@@ -111,7 +111,29 @@ Centang item saat selesai diimplementasi **dan** diverifikasi.
 | [x] | simple M+/M−/MC/MS/MR | sama dengan sci | ✅ wired |
 | [x] | Random (shift =) | CONST_RAND float [0,1) | ✅ Math.random |
 | [x] | CONST / CONV / STATS | buka dialog | ✅ `dialog/ConstantsDialog` + `ConversionDialog` + `StatisticsDialog` |
-| [x] | DMS shift a/b | konversi DMS `°' "` | ✅ `DmsHelper.toDms()` (fallback `°`) |
+| [x] | DMS shift a/b | konversi + cycle DMS (case 103) | ✅ full port `DegreeString` + `DegreeMinuteSecond` + `DmsHelper.convertTrailing` |
+
+**DMS (shift a/b) — port penuh dari raw:**
+
+- `expression/DegreeString.java` — port 1:1 `core/DegreeString.java` (parse `° ' "`, `b()/e()/f()`, `g()/n()`)
+- `expression/DegreeMinuteSecond.java` — port `numbers/DegreeMinuteSecond.java`:
+  - `Z(str)` parse → value + DegreeString
+  - ctor: split desimal → deg/min/sec (÷60, ÷3600, HALF_UP, carry 60)
+  - `Q(103)` cycle: integer→`N°`; desimal→`Y()` (`7.15`→`7°9'`); unit cycle `°`→`'`→`"`→`°`
+  - `Y()/R()/I()` display
+  - `FloatingPoint` diganti `BigDecimal` (aritmetika DMS saja; full FloatingPoint 977 baris tidak diport)
+- `expression/DmsHelper.convertTrailing` — apply `pressDms` ke **operand terakhir** saja (`AlgebraicInputHandler` case 103 → `equation.a()`/`M()`), bukan seluruh string → multi-operand: `5`→DMS, `+ 80`→DMS → `5° + 80°`
+
+**DMS × angka di evaluator (`ExpressionEvaluator`, port `DegreeMinuteSecond.f/g`):**
+
+| Operasi | Asli case | Hasil |
+| --- | --- | --- |
+| parse operand DMS | `DegreeMinuteSecond.Z` | `7°9'` → `7.15` |
+| DMS × number | f/g 54–55 wrap | `7°9' × 2` → `14°18'` |
+| DMS + − number | f/g 57–58 wrap | `7°9' + 1` → `8°9'` |
+| DMS ÷ number (DMS kiri) | f 56 plain | `7°9' ÷ 2` → `3.575` |
+
+Unit tests JVM: DMS state machine **19/19** + evaluator DMS **10/10 PASS**.
 
 ---
 
@@ -144,16 +166,20 @@ Diterapkan via `CalcTypefaceHelper.applyFontId` + `SimpleCalculatorActivity.appl
 ## Legend perubahan file
 
 - `sample/SimpleCalculatorActivity.java` — UI wiring: mode toggle, keypad simple/scientific, insert/backspace, display adapter
-- `sample/expression/ExpressionEvaluator.java` — evaluateExpression + helpers (sudut, HYP, word-ops, powers, percent)
+- `sample/expression/ExpressionEvaluator.java` — evaluateExpression + helpers (sudut, HYP, word-ops, powers, percent, DMS parse/wrap)
 - `sample/expression/ExpressionDecorator.java` — superskrip sudut d/r/g/h + adjust kursor
 - `sample/expression/CalcTokens.java` — AUTO_PAREN / OPERATOR / POSTFIX + longestSuffix
 - `sample/expression/NumberFormatHelper.java` — digit grouping + cursor map + fraction tags
 - `sample/expression/CalcSpannableFormatter.java` — markup → SpannableStringBuilder
+- `sample/expression/DegreeString.java` — port 1:1 parse `° ' "` (raw `core/DegreeString.java`)
+- `sample/expression/DegreeMinuteSecond.java` — DMS state machine: Z/Q(103)/Y (raw `numbers/DegreeMinuteSecond.java`)
+- `sample/expression/DmsHelper.java` — `convertTrailing` operand terakhir + `pressDms`
+- `sample/dialog/PhysicalConstant.java` / `Statistic.java` / `ConversionCategory.java` — data port
+- `sample/dialog/ConstantsDialog.java` / `ConversionDialog.java` / `StatisticsDialog.java` — H(2)/H(3)/H(6)
 - `sample/memory/CalculatorMemory.java` — reg 0 save/plus/minus/clear
-- `sample/ui/VerticalListEditText.java` / `VerticalListTextView.java` / `CalcTypefaceHelper.java`
+- `sample/ui/VerticalListEditText.java` / `VerticalListTextView.java` / `CalcTypefaceHelper.java` / `CalcFontSizeHelper.java`
 - `activity_simple_calculator.xml` — layout sci/simple
 - `styles.xml` — style tombol/font
-- (opsional nanti) token/entry model ringan agar DEL setara `Equation.b()`
 
 ---
 
@@ -171,8 +197,10 @@ Diterapkan via `CalcTypefaceHelper.applyFontId` + `SimpleCalculatorActivity.appl
 | 2026-09-24 | Refactor | **Split file** — Activity 1520→931; baru `ExpressionEvaluator` (454), `ExpressionDecorator` (86), `CalculatorMemory` (52), `CalcTokens` (47). Smoke PASS 4/4 |
 | 2026-09-24 | Refactor | **Sub-package** — `expression/` (eval+format), `memory/`, `ui/` (widgets+font); Activity tetap root. Layout XML class refs updated. Smoke PASS 5/5 |
 | 2026-09-24 | Batch 7 | **Font per-command** — SANS1/2 MONO1 SERI1/2 via `applyKeypadFonts()`; mapping dari `keyboardFont` + `f.java`. Build OK |
-| 2026-09-24 | UI fix | **Shift label + history** — label weight dihapus, gravity bottom 11sp; ListView divider #3A3A3A 0.5dp; `CalcFontSizeHelper` expr~23/result~28sp; `=` result putih. Commit `c3c0dda` |
-| 2026-09-24 | Batch 5b | **Dialogs** — CONST/CONV/STATS (`dialog/` package) + DMS convert (`DmsHelper`). Shift 0/./±/a-b wired. 65/65 done |
+| 2026-09-24 | UI fix | **Shift label + history** — label weight dihapus, gravity bottom 11sp; ListView divider #3A3A3A 0.5dp; `CalcFontSizeHelper` expr~23/result~28sp (port `BUTTON_FONTSIZE_BASELINE` ONE_COLUMN portrait); `=` result putih. Commit `c3c0dda` |
+| 2026-09-24 | Batch 5b | **Dialogs** — CONST/CONV/STATS (`dialog/` package) + DMS convert. Shift 0/./±/a-b wired. 65/65 done. Commit `7c63347` |
+| 2026-09-24 | DMS fix | **Port penuh DMS** — `DegreeString` 1:1 + `DegreeMinuteSecond` (Z/Q103/Y, BigDecimal); `convertTrailing` operand terakhir; `7.15`→`7°9'` (bukan `7.15°`); multi `5°+80°`; unit cycle. Unit **19/19**. Commit `3f338df` |
+| 2026-09-24 | DMS eval | **DMS × angka** — parse `7°9'`→`7.15`; wrap × + − hasil sebagai DMS (f/g 54–58); ÷ plain saat DMS kiri (f 56). `7°9'×2`→`14°18'`. Unit **10/10**. Commit `94f4a6e` |
 
 ---
 
