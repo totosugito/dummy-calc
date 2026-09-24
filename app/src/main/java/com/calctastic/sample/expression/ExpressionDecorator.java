@@ -1,10 +1,10 @@
-package com.calctastic.sample;
+package com.calctastic.sample.expression;
 
 /**
  * Angle-unit / hyperbolic display decoration — mirrors CalculatorCommand.C()
  * (equationStringStyled + AngleUnit.modifier or &lt;sup&gt;h&lt;/sup&gt;).
  */
-final class ExpressionDecorator {
+public final class ExpressionDecorator {
 
     private ExpressionDecorator() {}
 
@@ -19,7 +19,7 @@ final class ExpressionDecorator {
      * @param plainCursor cursor index in pre-decoration plain text (from formatEquation)
      * @param outCursor  [0] receives cursor index in post-decoration visible text
      */
-    static String decorateAngleFunctions(String tagged, int plainCursor, int[] outCursor, String angleUnit, boolean hyperbolic) {
+    public static String decorateAngleFunctions(String tagged, int plainCursor, int[] outCursor, String angleUnit, boolean hyperbolic) {
         if (outCursor != null && outCursor.length > 0) {
             outCursor[0] = plainCursor;
         }
@@ -79,7 +79,7 @@ final class ExpressionDecorator {
     }
 
     /** Back-compat: decorate without cursor adjustment (history path). */
-    static String decorateAngleFunctions(String tagged, String angleUnit, boolean hyperbolic) {
+    public static String decorateAngleFunctions(String tagged, String angleUnit, boolean hyperbolic) {
         return decorateAngleFunctions(tagged, Integer.MAX_VALUE, null, angleUnit, hyperbolic);
     }
 

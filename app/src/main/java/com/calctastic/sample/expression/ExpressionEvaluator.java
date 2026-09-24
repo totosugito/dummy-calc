@@ -1,18 +1,18 @@
-package com.calctastic.sample;
+package com.calctastic.sample.expression;
 
 /**
  * Expression evaluation engine for the sample calculator.
  * Ported from SimpleCalculatorActivity; angle/hyperbolic state mirrors ScientificData
  * (AngleUnit + hyperbolic flag from the decompiled original).
  */
-class ExpressionEvaluator {
+public class ExpressionEvaluator {
 
     /** AngleUnit: DEG / RAD / GRD */
-    String angleUnit = "DEG";
+    public String angleUnit = "DEG";
     /** ScientificData.hyperbolic */
-    boolean hyperbolic = false;
+    public boolean hyperbolic = false;
 
-    static boolean isExpressionComplete(String s) {
+    public static boolean isExpressionComplete(String s) {
         if (s == null || s.isEmpty()) return false;
         int depth = 0;
         for (int i = 0; i < s.length(); i++) {
@@ -35,7 +35,7 @@ class ExpressionEvaluator {
         return true;
     }
 
-    String evaluateExpression(String raw) {
+    public String evaluateExpression(String raw) {
         try {
             String expr = raw.replaceAll("×", "*")
                              .replaceAll("÷", "/")

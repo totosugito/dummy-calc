@@ -1,12 +1,12 @@
-package com.calctastic.sample;
+package com.calctastic.sample.memory;
 
 /**
  * Calculator memory register 0 — mirrors CalcMemory + Calculator MEMORY_SAVE/PLUS/MINUS/CLEAR.
  */
-class CalculatorMemory {
+public class CalculatorMemory {
 
     /** Register 0 value as plain string; null = empty (CalcMemory.g()). */
-    String value = null;
+    public String value = null;
 
     /** Current operand as plain string — live result preferred, else raw input (like inputHandler.e()). */
     String currentOperandString(String liveResult, String currentInput) {
@@ -31,7 +31,7 @@ class CalculatorMemory {
     }
 
     /** MEMORY_SAVE (ordinal 44): store current operand into register 0. */
-    void memorySave(String liveResult, String currentInput) {
+    public void memorySave(String liveResult, String currentInput) {
         String cur = currentOperandString(liveResult, currentInput);
         if (!cur.isEmpty()) {
             value = formatMem(parseOperand(cur));
@@ -42,7 +42,7 @@ class CalculatorMemory {
      * MEMORY_PLUS/MINUS (ordinals 48/49), Calculator.java:155–165:
      * mem0 = (mem0 or identity) ± currentOperand; store to register 0.
      */
-    void memoryPlusMinus(boolean plus, String liveResult, String currentInput) {
+    public void memoryPlusMinus(boolean plus, String liveResult, String currentInput) {
         double cur = parseOperand(currentOperandString(liveResult, currentInput));
         double mem = (value == null || value.isEmpty()) ? 0 : parseOperand(value);
         double result = plus ? mem + cur : mem - cur;

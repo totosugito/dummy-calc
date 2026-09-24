@@ -143,11 +143,14 @@ Saat ini sample memakai `CalcSimpleButton.*` umum (inter medium).
 
 ## Legend perubahan file
 
-- `SimpleCalculatorActivity.java` — UI wiring: mode toggle, keypad simple/scientific, insert/backspace, display adapter
-- `ExpressionEvaluator.java` — evaluateExpression + helpers (sudut, HYP, word-ops, powers, percent)
-- `ExpressionDecorator.java` — superskrip sudut d/r/g/h + adjust kursor
-- `CalculatorMemory.java` — reg 0 save/plus/minus/clear
-- `CalcTokens.java` — AUTO_PAREN / OPERATOR / POSTFIX + longestSuffix
+- `sample/SimpleCalculatorActivity.java` — UI wiring: mode toggle, keypad simple/scientific, insert/backspace, display adapter
+- `sample/expression/ExpressionEvaluator.java` — evaluateExpression + helpers (sudut, HYP, word-ops, powers, percent)
+- `sample/expression/ExpressionDecorator.java` — superskrip sudut d/r/g/h + adjust kursor
+- `sample/expression/CalcTokens.java` — AUTO_PAREN / OPERATOR / POSTFIX + longestSuffix
+- `sample/expression/NumberFormatHelper.java` — digit grouping + cursor map + fraction tags
+- `sample/expression/CalcSpannableFormatter.java` — markup → SpannableStringBuilder
+- `sample/memory/CalculatorMemory.java` — reg 0 save/plus/minus/clear
+- `sample/ui/VerticalListEditText.java` / `VerticalListTextView.java` / `CalcTypefaceHelper.java`
 - `activity_simple_calculator.xml` — layout sci/simple
 - `styles.xml` — style tombol/font
 - (opsional nanti) token/entry model ringan agar DEL setara `Equation.b()`
@@ -166,6 +169,7 @@ Saat ini sample memakai `CalcSimpleButton.*` umum (inter medium).
 | 2026-09-24 | Batch 6 | **Selesai + diverifikasi PASS 9/9** — sin(30)DEG=0.5; cos0=1; ln(e)=1; log100=2; abs(-5)=5; 5!=120; RAD sin(1)≈0.841; superskrip d/r/h |
 | 2026-09-24 | Fix | **Superskrip + kursor** — decorate setelah formatEquation (cari nama fn, bukan `sin(`); kursor disesuaikan +char sup; `evaluateLive` skip ekspresi belum lengkap. Verif PASS 4/4: `sin`+`5`→`sind(5` |
 | 2026-09-24 | Refactor | **Split file** — Activity 1520→931; baru `ExpressionEvaluator` (454), `ExpressionDecorator` (86), `CalculatorMemory` (52), `CalcTokens` (47). Smoke PASS 4/4 |
+| 2026-09-24 | Refactor | **Sub-package** — `expression/` (eval+format), `memory/`, `ui/` (widgets+font); Activity tetap root. Layout XML class refs updated. Smoke PASS 5/5 |
 
 ---
 

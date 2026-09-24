@@ -1,9 +1,10 @@
-package com.calctastic.sample;
+package com.calctastic.sample.ui;
 
 import android.content.Context;
 import android.graphics.Typeface;
 import android.util.Log;
 import androidx.core.content.res.ResourcesCompat;
+import com.calctastic.sample.R;
 
 public final class CalcTypefaceHelper {
 

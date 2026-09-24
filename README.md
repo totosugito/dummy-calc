@@ -62,13 +62,16 @@ Keypad disusun persis mengikuti konfigurasi layout `keyboard_portrait_simple.xml
 
 | File | Deskripsi |
 | :--- | :--- |
-| `SimpleCalculatorActivity.java` | Controller UI: lifecycle, wiring tombol simple/scientific, insert/backspace, adapter riwayat. |
-| `ExpressionEvaluator.java` | Mesin evaluasi ekspresi (fungsi trig/ln/log, sudut DEG/RAD/GRD, HYP, `!` `%` `mod` `nPr`…). |
-| `ExpressionDecorator.java` | Superskrip sudut `d`/`r`/`g`/`h` pada nama fungsi di tampilan ekspresi (setara `CalculatorCommand.C`). |
-| `CalculatorMemory.java` | Reg memori 0: save / recall / M+ / M− / MC (setara `CalcMemory` + `Calculator` case 44–49). |
-| `CalcTokens.java` | Tabel token: auto-paren fungsi (ordinal 68–86), operator multi-char, postfix. |
-| `NumberFormatHelper.java` | Engine pemformat digit ribuan, mapping indeks kursor layar, serta penyusunan tag pecahan (`sup`, `sf`, `hw`, `dim`). |
-| `CalcSpannableFormatter.java` | Parser markup XML mini ke Android `SpannableStringBuilder` untuk pewarnaan operator, kurung, dan styling pecahan. |
+| `sample/SimpleCalculatorActivity.java` | Controller UI: lifecycle, wiring tombol simple/scientific, insert/backspace, adapter riwayat. |
+| `sample/expression/ExpressionEvaluator.java` | Mesin evaluasi ekspresi (fungsi trig/ln/log, sudut DEG/RAD/GRD, HYP, `!` `%` `mod` `nPr`…). |
+| `sample/expression/ExpressionDecorator.java` | Superskrip sudut `d`/`r`/`g`/`h` pada nama fungsi di tampilan ekspresi (setara `CalculatorCommand.C`). |
+| `sample/expression/CalcTokens.java` | Tabel token: auto-paren fungsi (ordinal 68–86), operator multi-char, postfix. |
+| `sample/expression/NumberFormatHelper.java` | Engine pemformat digit ribuan, mapping indeks kursor layar, serta penyusunan tag pecahan (`sup`, `sf`, `hw`, `dim`). |
+| `sample/expression/CalcSpannableFormatter.java` | Parser markup XML mini ke Android `SpannableStringBuilder` untuk pewarnaan operator, kurung, dan styling pecahan. |
+| `sample/memory/CalculatorMemory.java` | Reg memori 0: save / recall / M+ / M− / MC (setara `CalcMemory` + `Calculator` case 44–49). |
+| `sample/ui/VerticalListEditText.java` | EditText input baris aktif (anti soft-keyboard, kursor oranye). |
+| `sample/ui/VerticalListTextView.java` | TextView baris riwayat. |
+| `sample/ui/CalcTypefaceHelper.java` | Pemuat font kalkulator (Roboto Mono / Inter Medium). |
 | `CalcTypefaceHelper.java` | Pengelola font kustom (Inter Medium, Roboto Mono). |
 | `activity_simple_calculator.xml` | Layout utama berisi area layar kalkulator (ListView) dan 7 baris tombol keypad. |
 | `history_dialog_list_item.xml` | Layout baris ListView yang menampung riwayat perhitungan maupun baris kalkulasi aktif. |

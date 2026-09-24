@@ -1,4 +1,4 @@
-package com.calctastic.sample;
+package com.calctastic.sample.expression;
 
 import android.graphics.Color;
 import android.text.SpannableStringBuilder;

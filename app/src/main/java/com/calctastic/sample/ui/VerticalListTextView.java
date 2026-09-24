@@ -1,4 +1,4 @@
-package com.calctastic.sample;
+package com.calctastic.sample.ui;
 
 import android.content.Context;
 import android.util.AttributeSet;

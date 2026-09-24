@@ -1,4 +1,4 @@
-package com.calctastic.sample;
+package com.calctastic.sample.expression;
 
 import java.util.ArrayList;
 import java.util.List;
