@@ -56,8 +56,9 @@ public class PowerRenderer implements MathTokenRenderer {
             PlaceholderBoxRenderer.drawPlaceholderBox(canvas, boxRect, isExpFocused, ctx);
 
             if (isExpFocused) {
-                ctx.cursorDrawPosition.set(boxRect.centerX(), expY);
-                ctx.cursorHeight = emptyBoxH * 0.8f;
+                // Posisi tepat di tengah box dengan padding vertikal (kursor lebih kecil dari box)
+                ctx.cursorDrawPosition.set(boxRect.centerX(), boxRect.centerY());
+                ctx.cursorHeight = emptyBoxH * 0.6f;
             }
             curX += emptyBoxW;
         } else {

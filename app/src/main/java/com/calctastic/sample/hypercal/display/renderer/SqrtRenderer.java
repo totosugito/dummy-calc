@@ -43,7 +43,9 @@ public class SqrtRenderer implements MathTokenRenderer {
         float actualInnerW = innerW > 0 ? innerW : emptyBoxW;
 
         float radicalW = textSize * 0.55f;
-        float topY = baselineY - (textSize * 0.75f);
+        float radicalStrokeW = Math.max(2f * ctx.density, textSize * 0.055f);
+        // Naikkan garis atap akar (topY) agar memberi ruang vertikal yang cukup untuk konten/box di bawahnya
+        float topY = baselineY - (textSize * 0.90f);
         float botY = baselineY + (textSize * 0.45f);
         float midY = baselineY + (textSize * 0.05f);
 
@@ -56,7 +58,7 @@ public class SqrtRenderer implements MathTokenRenderer {
 
         Paint strokePaint = new Paint(ctx.mathAccentPaint);
         strokePaint.setStyle(Paint.Style.STROKE);
-        strokePaint.setStrokeWidth(Math.max(2f * ctx.density, textSize * 0.055f));
+        strokePaint.setStrokeWidth(radicalStrokeW);
         strokePaint.setStrokeCap(Paint.Cap.ROUND);
         strokePaint.setStrokeJoin(Paint.Join.ROUND);
         canvas.drawPath(rootPath, strokePaint);
@@ -65,14 +67,16 @@ public class SqrtRenderer implements MathTokenRenderer {
         boolean isThisFocused = (ctx.containerFocusIndex == tokenIndex && !ctx.containerInSecondary);
 
         if (token.children.isEmpty()) {
-            // Gambar kotak slot kosong jika akar belum ada isinya (QA.java & C0357yG.java)
-            float boxTop = baselineY - (emptyBoxH * 0.65f);
+            // Gambar kotak slot kosong dengan jarak aman (clearance) di bawah garis akar (QA.java & C0357yG.java)
+            float marginBelowBar = (2.5f * ctx.density) + (radicalStrokeW / 2f);
+            float boxTop = topY + marginBelowBar;
             RectF boxRect = new RectF(curX, boxTop, curX + emptyBoxW, boxTop + emptyBoxH);
             PlaceholderBoxRenderer.drawPlaceholderBox(canvas, boxRect, isThisFocused, ctx);
 
             if (isThisFocused) {
-                ctx.cursorDrawPosition.set(boxRect.centerX(), baselineY);
-                ctx.cursorHeight = emptyBoxH * 0.8f;
+                // Posisi tepat di tengah box dengan padding vertikal (kursor lebih kecil dari box)
+                ctx.cursorDrawPosition.set(boxRect.centerX(), boxRect.centerY());
+                ctx.cursorHeight = emptyBoxH * 0.6f;
             }
         } else {
             // Jika ada isinya, render anak-anaknya dan posisi kursor di dalamnya
