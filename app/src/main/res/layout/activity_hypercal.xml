@@ -3,24 +3,254 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center"
-    android:padding="32dp"
+    android:fitsSystemWindows="true"
     android:background="#121212">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="HyperCal"
-        android:textColor="#FFFFFF"
-        android:textSize="26sp"
-        android:fontFamily="@font/font_inter_medium" />
+    <!-- Header Bar with title -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:background="#1B1B1B">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Under construction"
-        android:textColor="#FF9800"
-        android:textSize="14sp"
-        android:fontFamily="@font/font_inter_medium"
-        android:layout_marginTop="8dp" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="HyperCal"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:fontFamily="@font/font_inter_medium" />
+
+        <TextView
+            android:id="@+id/formula_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text=""
+            android:textColor="#4CAF50"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:singleLine="true" />
+    </LinearLayout>
+
+    <!-- Custom Canvas Expression Display (HiPER BE.java / AbstractC0335wD) -->
+    <com.calctastic.sample.hypercal.view.HyperCalDisplayView
+        android:id="@+id/hypercal_display"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1.0"
+        android:background="#151515" />
+
+    <!-- Divider Bar -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#2E2E2E" />
+
+    <!-- 7-Row CalcTastic Simple Keypad Layout -->
+    <TableLayout
+        android:id="@+id/simple_keypad"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2.0"
+        android:padding="2dp"
+        android:stretchColumns="*">
+
+        <!-- Row 1: Memory row: M+ , M- , MC , MS , MR -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.8">
+
+            <Button
+                android:id="@+id/btn_mem_plus"
+                android:text="M+"
+                style="@style/CalcSimpleButton.Secondary" />
+            <Button
+                android:id="@+id/btn_mem_minus"
+                android:text="M−"
+                style="@style/CalcSimpleButton.Secondary" />
+            <Button
+                android:id="@+id/btn_mem_clear"
+                android:text="MC"
+                style="@style/CalcSimpleButton.Secondary" />
+            <Button
+                android:id="@+id/btn_mem_save"
+                android:text="MS"
+                style="@style/CalcSimpleButton.Secondary" />
+            <Button
+                android:id="@+id/btn_mem_recall"
+                android:text="MR"
+                style="@style/CalcSimpleButton.Secondary" />
+        </TableRow>
+
+        <!-- Row 2: a/b , √x , % , ( , ) -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.85">
+
+            <Button
+                android:id="@+id/btn_fraction"
+                android:text="a/b"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_sqrt"
+                android:text="√x"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_percent"
+                android:text="%"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_paren_open"
+                android:text="("
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_paren_close"
+                android:text=")"
+                style="@style/CalcSimpleButton.Function" />
+        </TableRow>
+
+        <!-- Row 3: 1/x , x² , y^x , ◀ , ▶ -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.85">
+
+            <Button
+                android:id="@+id/btn_reciprocal"
+                android:text="1/x"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_square"
+                android:text="x²"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_power"
+                android:text="xʸ"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_cursor_left"
+                android:text="◀"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_cursor_right"
+                android:text="▶"
+                style="@style/CalcSimpleButton.Function" />
+        </TableRow>
+
+        <!-- Row 4: 7 , 8 , 9 , DEL , CLR -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+
+            <Button
+                android:id="@+id/btn_7"
+                android:text="7"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_8"
+                android:text="8"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_9"
+                android:text="9"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_delete"
+                android:text="DEL"
+                style="@style/CalcSimpleButton.Clear" />
+            <Button
+                android:id="@+id/btn_clear"
+                android:text="CLR"
+                style="@style/CalcSimpleButton.Clear" />
+        </TableRow>
+
+        <!-- Row 5: 4 , 5 , 6 , × , ÷ -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+
+            <Button
+                android:id="@+id/btn_4"
+                android:text="4"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_5"
+                android:text="5"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_6"
+                android:text="6"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_mul"
+                android:text="×"
+                style="@style/CalcSimpleButton.Operator" />
+            <Button
+                android:id="@+id/btn_div"
+                android:text="÷"
+                style="@style/CalcSimpleButton.Operator" />
+        </TableRow>
+
+        <!-- Row 6: 1 , 2 , 3 , + , − -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+
+            <Button
+                android:id="@+id/btn_1"
+                android:text="1"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_2"
+                android:text="2"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_3"
+                android:text="3"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_add"
+                android:text="+"
+                style="@style/CalcSimpleButton.Operator" />
+            <Button
+                android:id="@+id/btn_sub"
+                android:text="−"
+                style="@style/CalcSimpleButton.Operator" />
+        </TableRow>
+
+        <!-- Row 7: 0 , . , ± , = (2-span) -->
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1.0">
+
+            <Button
+                android:id="@+id/btn_0"
+                android:text="0"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_dot"
+                android:text="."
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_negate"
+                android:text="±"
+                style="@style/CalcSimpleButton.Number" />
+            <Button
+                android:id="@+id/btn_equals"
+                android:text="="
+                android:layout_span="2"
+                style="@style/CalcSimpleButton.Equals" />
+        </TableRow>
+    </TableLayout>
 </LinearLayout>
