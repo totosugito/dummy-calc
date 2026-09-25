@@ -1,4 +1,4 @@
-package com.calctastic.sample.dialog;
+package com.calctastic.sample.calctastic.dialog;
 
 /** Unit conversion categories — port from com.calctastic.calculator.conversions */
 public enum ConversionCategory {

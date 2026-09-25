@@ -1,4 +1,4 @@
-package com.calctastic.sample.expression;
+package com.calctastic.sample.calctastic.expression;
 
 /**
  * Shared token tables from CalculatorCommand / Equation.T (auto-paren ordinals 68–86).

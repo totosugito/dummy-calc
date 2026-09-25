@@ -1,4 +1,4 @@
-package com.calctastic.sample.dialog;
+package com.calctastic.sample.calctastic.dialog;
 
 /** Physical constants — port from com.calctastic.calculator.constants.PhysicalConstant */
 public enum PhysicalConstant {

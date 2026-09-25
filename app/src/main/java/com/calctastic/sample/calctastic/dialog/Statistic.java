@@ -1,4 +1,4 @@
-package com.calctastic.sample.dialog;
+package com.calctastic.sample.calctastic.dialog;
 
 /** Statistics labels — port from com.calctastic.calculator.statistics.Statistic */
 public enum Statistic {

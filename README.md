@@ -62,7 +62,7 @@ Keypad disusun persis mengikuti konfigurasi layout `keyboard_portrait_simple.xml
 
 | File | Deskripsi |
 | :--- | :--- |
-| `sample/SimpleCalculatorActivity.java` | Controller UI: lifecycle, wiring tombol simple/scientific, insert/backspace, adapter riwayat. |
+| `sample/calctastic/CalctasticCalculatorActivity.java` | Controller UI: lifecycle, wiring tombol simple/scientific, insert/backspace, adapter riwayat. |
 | `sample/expression/ExpressionEvaluator.java` | Mesin evaluasi ekspresi (fungsi trig/ln/log, sudut DEG/RAD/GRD, HYP, `!` `%` `mod` `nPr`…). |
 | `sample/expression/ExpressionDecorator.java` | Superskrip sudut `d`/`r`/`g`/`h` pada nama fungsi di tampilan ekspresi (setara `CalculatorCommand.C`). |
 | `sample/expression/CalcTokens.java` | Tabel token: auto-paren fungsi (ordinal 68–86), operator multi-char, postfix. |

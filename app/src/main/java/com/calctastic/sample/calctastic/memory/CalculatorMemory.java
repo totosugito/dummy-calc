@@ -1,4 +1,4 @@
-package com.calctastic.sample.memory;
+package com.calctastic.sample.calctastic.memory;
 
 /**
  * Calculator memory register 0 — mirrors CalcMemory + Calculator MEMORY_SAVE/PLUS/MINUS/CLEAR.

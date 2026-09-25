@@ -1,4 +1,4 @@
-package com.calctastic.sample.expression;
+package com.calctastic.sample.calctastic.expression;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

@@ -159,13 +159,13 @@ Unit tests JVM: DMS state machine **19/19** + evaluator DMS **10/10 PASS**.
 | [x] | SERI1 | font_stix_two_text_medium | `=` `π` `±` `+ − × ÷` |
 | [x] | SERI2 | font_hepta_slab_medium | `a/b` `x²` `yˣ` `1/x` `√` `.` |
 
-Diterapkan via `CalcTypefaceHelper.applyFontId` + `SimpleCalculatorActivity.applyKeypadFonts()` (panggilan di `onCreate` setelah wiring). Mapping id→font dari `CalculatorCommand.keyboardFont` / `f.java:31–41`.
+Diterapkan via `CalcTypefaceHelper.applyFontId` + `CalctasticCalculatorActivity.applyKeypadFonts()` (panggilan di `onCreate` setelah wiring). Mapping id→font dari `CalculatorCommand.keyboardFont` / `f.java:31–41`.
 
 ---
 
 ## Legend perubahan file
 
-- `sample/SimpleCalculatorActivity.java` — UI wiring: mode toggle, keypad simple/scientific, insert/backspace, display adapter
+- `sample/calctastic/CalctasticCalculatorActivity.java` — UI wiring: mode toggle, keypad simple/scientific, insert/backspace, display adapter
 - `sample/expression/ExpressionEvaluator.java` — evaluateExpression + helpers (sudut, HYP, word-ops, powers, percent, DMS parse/wrap)
 - `sample/expression/ExpressionDecorator.java` — superskrip sudut d/r/g/h + adjust kursor
 - `sample/expression/CalcTokens.java` — AUTO_PAREN / OPERATOR / POSTFIX + longestSuffix

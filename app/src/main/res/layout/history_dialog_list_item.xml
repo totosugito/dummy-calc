@@ -5,7 +5,7 @@
     android:layout_height="wrap_content"
     android:baselineAligned="false">
 
-        <com.calctastic.sample.ui.VerticalListTextView
+        <com.calctastic.sample.calctastic.ui.VerticalListTextView
             android:id="@+id/history_divider"
             android:textSize="12dp"
             android:gravity="center"
@@ -15,7 +15,7 @@
             android:fontFamily="@font/font_inter_medium"
             style="@style/CalcTastic.ListItemStyle" />
 
-        <com.calctastic.sample.ui.VerticalListTextView
+        <com.calctastic.sample.calctastic.ui.VerticalListTextView
             android:id="@+id/history_calculation"
             android:gravity="left|center_vertical"
             android:layout_width="match_parent"
@@ -25,7 +25,7 @@
             android:ellipsize="end"
             style="@style/CalcTastic.ListItemStyle.Description" />
 
-        <com.calctastic.sample.ui.VerticalListTextView
+        <com.calctastic.sample.calctastic.ui.VerticalListTextView
             android:id="@+id/history_result"
             android:gravity="right|center_vertical"
             android:layout_width="match_parent"
@@ -42,7 +42,7 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <com.calctastic.sample.ui.VerticalListEditText
+            <com.calctastic.sample.calctastic.ui.VerticalListEditText
                 android:id="@+id/current_calculation"
                 android:gravity="top|left"
                 android:longClickable="false"
@@ -85,7 +85,7 @@
             </LinearLayout>
         </LinearLayout>
 
-        <com.calctastic.sample.ui.VerticalListTextView
+        <com.calctastic.sample.calctastic.ui.VerticalListTextView
             android:id="@+id/active_live_result"
             android:gravity="center"
             android:layout_width="match_parent"

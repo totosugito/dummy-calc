@@ -1,4 +1,4 @@
-package com.calctastic.sample.dialog;
+package com.calctastic.sample.calctastic.dialog;
 
 import android.app.AlertDialog;
 import android.content.Context;

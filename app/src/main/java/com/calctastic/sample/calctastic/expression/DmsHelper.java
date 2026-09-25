@@ -1,4 +1,4 @@
-package com.calctastic.sample.expression;
+package com.calctastic.sample.calctastic.expression;
 
 /**
  * DMS entry point for the sample calculator.

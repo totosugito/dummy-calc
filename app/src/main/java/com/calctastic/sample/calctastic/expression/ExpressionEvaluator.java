@@ -1,8 +1,8 @@
-package com.calctastic.sample.expression;
+package com.calctastic.sample.calctastic.expression;
 
 /**
  * Expression evaluation engine for the sample calculator.
- * Ported from SimpleCalculatorActivity; angle/hyperbolic state mirrors ScientificData
+ * Ported from CalctasticCalculatorActivity; angle/hyperbolic state mirrors ScientificData
  * (AngleUnit + hyperbolic flag from the decompiled original).
  */
 public class ExpressionEvaluator {

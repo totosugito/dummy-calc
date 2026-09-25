@@ -1,4 +1,4 @@
-package com.calctastic.sample.expression;
+package com.calctastic.sample.calctastic.expression;
 
 /**
  * Angle-unit / hyperbolic display decoration — mirrors CalculatorCommand.C()

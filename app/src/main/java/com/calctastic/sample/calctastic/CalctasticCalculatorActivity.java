@@ -1,4 +1,4 @@
-package com.calctastic.sample;
+package com.calctastic.sample.calctastic;
 
 import android.app.Activity;
 import android.graphics.Color;
@@ -15,24 +15,25 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
-import com.calctastic.sample.dialog.ConstantsDialog;
-import com.calctastic.sample.dialog.ConversionDialog;
-import com.calctastic.sample.dialog.Statistic;
-import com.calctastic.sample.dialog.StatisticsDialog;
-import com.calctastic.sample.expression.CalcSpannableFormatter;
-import com.calctastic.sample.expression.CalcTokens;
-import com.calctastic.sample.expression.DmsHelper;
-import com.calctastic.sample.expression.ExpressionDecorator;
-import com.calctastic.sample.expression.ExpressionEvaluator;
-import com.calctastic.sample.expression.NumberFormatHelper;
-import com.calctastic.sample.memory.CalculatorMemory;
-import com.calctastic.sample.ui.CalcFontSizeHelper;
-import com.calctastic.sample.ui.CalcTypefaceHelper;
-import com.calctastic.sample.ui.VerticalListEditText;
+import com.calctastic.sample.R;
+import com.calctastic.sample.calctastic.dialog.ConstantsDialog;
+import com.calctastic.sample.calctastic.dialog.ConversionDialog;
+import com.calctastic.sample.calctastic.dialog.Statistic;
+import com.calctastic.sample.calctastic.dialog.StatisticsDialog;
+import com.calctastic.sample.calctastic.expression.CalcSpannableFormatter;
+import com.calctastic.sample.calctastic.expression.CalcTokens;
+import com.calctastic.sample.calctastic.expression.DmsHelper;
+import com.calctastic.sample.calctastic.expression.ExpressionDecorator;
+import com.calctastic.sample.calctastic.expression.ExpressionEvaluator;
+import com.calctastic.sample.calctastic.expression.NumberFormatHelper;
+import com.calctastic.sample.calctastic.memory.CalculatorMemory;
+import com.calctastic.sample.calctastic.ui.CalcFontSizeHelper;
+import com.calctastic.sample.calctastic.ui.CalcTypefaceHelper;
+import com.calctastic.sample.calctastic.ui.VerticalListEditText;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SimpleCalculatorActivity extends Activity {
+public class CalctasticCalculatorActivity extends Activity {
 
     public static class HistoryEntry {
         public String expression;

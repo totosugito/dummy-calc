@@ -1,4 +1,4 @@
-package com.calctastic.sample.ui;
+package com.calctastic.sample.calctastic.ui;
 
 import android.content.Context;
 import android.graphics.Typeface;
