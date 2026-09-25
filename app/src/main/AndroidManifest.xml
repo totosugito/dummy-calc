@@ -25,6 +25,6 @@
 
         <activity
             android:name=".hypercal.HyperCalActivity"
-            android:exported="false" />
+            android:exported="true" />
     </application>
 </manifest>
