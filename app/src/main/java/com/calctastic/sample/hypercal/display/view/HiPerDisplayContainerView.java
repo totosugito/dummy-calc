@@ -102,12 +102,20 @@ public class HiPerDisplayContainerView extends FrameLayout {
         canvasView.appendFraction();
     }
 
+    public void appendReciprocal() {
+        canvasView.appendReciprocal();
+    }
+
     public void appendSqrt() {
         canvasView.appendSqrt();
     }
 
     public void appendPower() {
         canvasView.appendPower();
+    }
+
+    public void appendSquare() {
+        canvasView.appendSquare();
     }
 
     public void deleteBackward() {

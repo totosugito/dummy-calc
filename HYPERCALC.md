@@ -102,16 +102,19 @@ Struktur kode kini telah direfaktor menjadi **multi-file modular** mengikuti pem
    - [`HiPerExpressionCanvasView.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/view/HiPerExpressionCanvasView.java): Hanya fokus pada viewport, kedip kursor vertikal lurus, scroll offset, dan mendelegasikan rendering ke registry.
    - [`HiPerDisplayContainerView.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/view/HiPerDisplayContainerView.java): Kontainer display dengan status bar atas (DEG/RAD).
 
-2. **Sistem Visualizer / Token Renderers (`display/renderer/`)**:
+2. **Model Dokumen Formula (`display/model/`)**:
+   - [`MathFormulaDocument.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/model/MathFormulaDocument.java): Mengatur AST tokens dan navigasi fokus kursor container multi-level (`containerFocusIndex`, `containerInSecondary`, `containerSubCursor`) untuk Pecahan, Akar, dan Pangkat.
+
+3. **Sistem Visualizer / Token Renderers (`display/renderer/`)**:
    - [`MathTokenRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/MathTokenRenderer.java): Interface dasar untuk setiap renderer komponen (setara `AbstractC0335wD.java`).
    - [`FractionRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/FractionRenderer.java): Visualizer khusus struktur pecahan pembilang, fraction bar, penyebut (setara `Qg.java`).
-   - [`PlaceholderBoxRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/PlaceholderBoxRenderer.java): Visualizer khusus kotak slot kosong (setara `C0357yG.java`).
-   - [`SqrtRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/SqrtRenderer.java): Visualizer khusus tanda akar (setara `C0119aE.java`).
-   - [`PowerRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/PowerRenderer.java): Visualizer khusus pangkat/eksponen (setara `C0349xH.java`).
+   - [`PlaceholderBoxRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/PlaceholderBoxRenderer.java): Visualizer khusus kotak slot kosong (setara `C0357yG.java` & `QA.java`). Rumus ukuran: lebar `paint.measureText("0") * 1.2f`, tinggi `-ascent + 0.9f * density + descent`.
+   - [`SqrtRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/SqrtRenderer.java): Visualizer khusus tanda akar (setara `C0102Vh.java`). Jika argumen akar kosong (`token.children.isEmpty()`), menampilkan kotak placeholder box di bawah atap radikal dan menempatkan kursor di dalamnya saat aktif.
+   - [`PowerRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/PowerRenderer.java): Visualizer khusus pangkat/eksponen (setara `C0349xH.java`). Jika eksponen kosong (`token.secondaryChildren.isEmpty()`), menampilkan kotak placeholder box berskala 0.7x di posisi eksponen atas.
    - [`TextTokenRenderer.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/TextTokenRenderer.java): Visualizer teks angka, operator, dan kurung (setara `C0329vH.java`).
    - [`TokenRendererRegistry.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/TokenRendererRegistry.java): Registri penghubung tipe token ke visualizernya (setara `PH.java`).
    - [`RenderContext.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/renderer/RenderContext.java): Data context yang dibagikan antar visualizer saat merender pohon token (setara `C0150dI.java`).
 
-3. **Tema & Integrasi**:
+4. **Tema & Integrasi**:
    - [`HiPerThemeColors.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/display/view/HiPerThemeColors.java): Definisi palet warna tema HiPER.
    - [`HyperCalActivity.java`](file:///home/toto/Documents/dummy-calc/app/src/main/java/com/calctastic/sample/hypercal/HyperCalActivity.java): Activity penghubung keypad Calctastic dan display HiPER.

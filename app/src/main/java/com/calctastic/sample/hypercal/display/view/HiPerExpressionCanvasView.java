@@ -32,6 +32,7 @@ public class HiPerExpressionCanvasView extends View implements MathFormulaDocume
     private final MathFormulaDocument document = new MathFormulaDocument();
     private final TokenRendererRegistry registry = new TokenRendererRegistry();
     private final List<RenderContext.FractionHitBox> fractionHitBoxes = new ArrayList<>();
+    private final List<RenderContext.ContainerHitBox> containerHitBoxes = new ArrayList<>();
     private final RenderContext renderContext = new RenderContext();
 
     private Paint textPaint;
@@ -105,9 +106,15 @@ public class HiPerExpressionCanvasView extends View implements MathFormulaDocume
         renderContext.placeholderBoxPaint = placeholderBoxPaint;
         renderContext.density = density;
         renderContext.hitBoxes = fractionHitBoxes;
+        renderContext.containerHitBoxes = containerHitBoxes;
         renderContext.registry = registry;
 
         gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent e) {
+                return true;
+            }
+
             @Override
             public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
                 scrollOffsetX -= distanceX;
@@ -119,7 +126,7 @@ public class HiPerExpressionCanvasView extends View implements MathFormulaDocume
             @Override
             public boolean onSingleTapUp(MotionEvent e) {
                 float startX = getPaddingLeft() + scrollOffsetX;
-                document.handleTap(e.getX(), e.getY(), startX, registry, baseTextSize, renderContext, fractionHitBoxes);
+                document.handleTap(e.getX(), e.getY(), startX, registry, baseTextSize, renderContext, fractionHitBoxes, containerHitBoxes);
                 return true;
             }
         });
@@ -167,8 +174,10 @@ public class HiPerExpressionCanvasView extends View implements MathFormulaDocume
     public void appendOperator(String op) { document.appendOperator(op); }
     public void appendToken(MathToken token) { document.appendToken(token); }
     public void appendFraction() { document.appendFraction(); }
+    public void appendReciprocal() { document.appendReciprocal(); }
     public void appendSqrt() { document.appendSqrt(); }
     public void appendPower() { document.appendPower(); }
+    public void appendSquare() { document.appendSquare(); }
     public void deleteBackward() { document.deleteBackward(); }
     public void clearAll() { document.clearAll(); }
     public void moveCursorLeft() { document.moveCursorLeft(); }
@@ -217,6 +226,7 @@ public class HiPerExpressionCanvasView extends View implements MathFormulaDocume
         }
 
         fractionHitBoxes.clear();
+        containerHitBoxes.clear();
         float curX = startX;
         cursorDrawPosition.set(curX, exprBaselineY);
         cursorHeight = baseTextSize * 1.15f;
@@ -225,26 +235,31 @@ public class HiPerExpressionCanvasView extends View implements MathFormulaDocume
         renderContext.fractionFocusIndex = document.getFractionFocusIndex();
         renderContext.fractionInDenominator = document.isFractionInDenominator();
         renderContext.fractionSubCursor = document.getFractionSubCursor();
+
+        renderContext.containerFocusIndex = document.getContainerFocusIndex();
+        renderContext.containerInSecondary = document.isContainerInSecondary();
+        renderContext.containerSubCursor = document.getContainerSubCursor();
+
         renderContext.cursorDrawPosition.set(curX, exprBaselineY);
         renderContext.cursorHeight = cursorHeight;
 
         // 1. Gambar Baris Atas: EXPRESSION LINE
         List<MathToken> tokens = document.getTokens();
         int cursorIdx = document.getCursorIndex();
-        int fracFocus = document.getFractionFocusIndex();
+        int containerFocus = document.getContainerFocusIndex();
 
         for (int i = 0; i < tokens.size(); i++) {
-            if (fracFocus < 0 && i == cursorIdx) {
+            if (containerFocus < 0 && i == cursorIdx) {
                 cursorDrawPosition.set(curX, exprBaselineY);
                 cursorHeight = baseTextSize * 1.15f;
             }
             curX = registry.draw(canvas, tokens.get(i), curX, exprBaselineY, baseTextSize, i, renderContext);
         }
 
-        if (fracFocus < 0 && cursorIdx == tokens.size()) {
+        if (containerFocus < 0 && cursorIdx == tokens.size()) {
             cursorDrawPosition.set(curX, exprBaselineY);
             cursorHeight = baseTextSize * 1.15f;
-        } else if (fracFocus >= 0) {
+        } else if (containerFocus >= 0) {
             cursorDrawPosition.set(renderContext.cursorDrawPosition);
             cursorHeight = renderContext.cursorHeight;
         }

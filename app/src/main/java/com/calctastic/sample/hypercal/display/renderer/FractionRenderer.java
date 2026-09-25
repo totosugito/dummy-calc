@@ -77,13 +77,14 @@ public class FractionRenderer implements MathTokenRenderer {
         float numStartX = x + (fracW - actualNumW) / 2f;
 
         if (token.children.isEmpty()) {
-            RectF boxRect = new RectF(numStartX, numY - (emptyBoxH / 2f), numStartX + emptyBoxW, numY + (emptyBoxH / 2f));
+            float boxTop = numY - (emptyBoxH / 2f);
+            RectF boxRect = new RectF(numStartX, boxTop, numStartX + emptyBoxW, boxTop + emptyBoxH);
             boolean isFocused = isThisFracFocused && !ctx.fractionInDenominator;
             PlaceholderBoxRenderer.drawPlaceholderBox(canvas, boxRect, isFocused, ctx);
 
             if (isFocused) {
-                ctx.cursorDrawPosition.set(boxRect.centerX(), numY);
-                ctx.cursorHeight = emptyBoxH * 0.75f;
+                ctx.cursorDrawPosition.set(boxRect.centerX(), boxRect.centerY());
+                ctx.cursorHeight = emptyBoxH * 0.6f;
             }
         } else {
             float numCurX = numStartX;
@@ -106,13 +107,15 @@ public class FractionRenderer implements MathTokenRenderer {
         float denStartX = x + (fracW - actualDenW) / 2f;
 
         if (token.secondaryChildren.isEmpty()) {
-            RectF boxRect = new RectF(denStartX, denY - (emptyBoxH / 2f), denStartX + emptyBoxW, denY + (emptyBoxH / 2f));
+            float boxTop = denY - (emptyBoxH / 2f);
+            RectF boxRect = new RectF(denStartX, boxTop, denStartX + emptyBoxW, boxTop + emptyBoxH);
             boolean isFocused = isThisFracFocused && ctx.fractionInDenominator;
             PlaceholderBoxRenderer.drawPlaceholderBox(canvas, boxRect, isFocused, ctx);
 
             if (isFocused) {
-                ctx.cursorDrawPosition.set(boxRect.centerX(), denY);
-                ctx.cursorHeight = emptyBoxH * 0.75f;
+                // Posisi tepat di tengah box dengan padding vertikal (kursor lebih kecil dari box)
+                ctx.cursorDrawPosition.set(boxRect.centerX(), boxRect.centerY());
+                ctx.cursorHeight = emptyBoxH * 0.6f;
             }
         } else {
             float denCurX = denStartX;
@@ -134,8 +137,13 @@ public class FractionRenderer implements MathTokenRenderer {
         if (ctx.hitBoxes != null) {
             RenderContext.FractionHitBox hitBox = new RenderContext.FractionHitBox();
             hitBox.tokenIndex = tokenIndex;
-            hitBox.numBox.set(x, lineY - (gapY * 1.8f), x + fracW, lineY);
-            hitBox.denBox.set(x, lineY, x + fracW, lineY + (gapY * 1.8f));
+            float touchPad = 8f * ctx.density;
+            hitBox.numBox.set(x - touchPad, lineY - (gapY * 2.2f), x + fracW + touchPad, lineY);
+            hitBox.denBox.set(x - touchPad, lineY, x + fracW + touchPad, lineY + (gapY * 2.2f));
+            hitBox.numStartX = numStartX;
+            hitBox.numWidth = actualNumW;
+            hitBox.denStartX = denStartX;
+            hitBox.denWidth = actualDenW;
             ctx.hitBoxes.add(hitBox);
         }
 

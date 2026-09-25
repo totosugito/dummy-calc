@@ -1,11 +1,13 @@
 package com.calctastic.sample.hypercal.display.renderer;
 
 import android.graphics.Canvas;
+import android.graphics.RectF;
 import com.calctastic.sample.hypercal.display.model.MathToken;
 
 /**
  * PowerRenderer:
- * Mengimplementasikan rendering pangkat/eksponen berdasarkan android.core.C0349xH.java.
+ * Mengimplementasikan rendering pangkat/eksponen berdasarkan android.core.C0349xH.java dan QA.java.
+ * Menampilkan kotak slot kosong (placeholder box) pada eksponen saat eksponen belum diisi.
  */
 public class PowerRenderer implements MathTokenRenderer {
 
@@ -15,10 +17,19 @@ public class PowerRenderer implements MathTokenRenderer {
         for (MathToken c : token.children) {
             baseW += ctx.registry.measureWidth(c, textSize, ctx);
         }
+
+        float expSize = textSize * 0.7f;
+        ctx.textPaint.setTextSize(expSize);
+        float emptyBoxW = PlaceholderBoxRenderer.measureEmptyBoxWidth(ctx.textPaint);
+
         float expW = 0f;
         for (MathToken c : token.secondaryChildren) {
-            expW += ctx.registry.measureWidth(c, textSize * 0.7f, ctx);
+            expW += ctx.registry.measureWidth(c, expSize, ctx);
         }
+        if (expW == 0f) {
+            expW = emptyBoxW;
+        }
+
         return baseW + expW + (4f * ctx.density);
     }
 
@@ -29,12 +40,52 @@ public class PowerRenderer implements MathTokenRenderer {
             curX = ctx.registry.draw(canvas, c, curX, baselineY, textSize, -1, ctx);
         }
 
+        float expStartX = curX;
         float expSize = textSize * 0.7f;
-        float expY = baselineY - (textSize * 0.5f);
-        for (MathToken expChild : token.secondaryChildren) {
-            curX = ctx.registry.draw(canvas, expChild, curX, expY, expSize, -1, ctx);
+        ctx.textPaint.setTextSize(expSize);
+        float emptyBoxW = PlaceholderBoxRenderer.measureEmptyBoxWidth(ctx.textPaint);
+        float emptyBoxH = PlaceholderBoxRenderer.measureEmptyBoxHeight(ctx.textPaint, ctx.density);
+
+        float expY = baselineY - (textSize * 0.45f);
+        boolean isExpFocused = (ctx.containerFocusIndex == tokenIndex && ctx.containerInSecondary);
+
+        if (token.secondaryChildren.isEmpty()) {
+            // Render kotak slot kosong pada eksponen pangkat (C0357yG.java)
+            float boxTop = expY - (emptyBoxH * 0.65f);
+            RectF boxRect = new RectF(curX, boxTop, curX + emptyBoxW, boxTop + emptyBoxH);
+            PlaceholderBoxRenderer.drawPlaceholderBox(canvas, boxRect, isExpFocused, ctx);
+
+            if (isExpFocused) {
+                ctx.cursorDrawPosition.set(boxRect.centerX(), expY);
+                ctx.cursorHeight = emptyBoxH * 0.8f;
+            }
+            curX += emptyBoxW;
+        } else {
+            if (isExpFocused && ctx.containerSubCursor == 0) {
+                ctx.cursorDrawPosition.set(curX, expY);
+                ctx.cursorHeight = expSize * 1.1f;
+            }
+            for (int ci = 0; ci < token.secondaryChildren.size(); ci++) {
+                MathToken expChild = token.secondaryChildren.get(ci);
+                curX = ctx.registry.draw(canvas, expChild, curX, expY, expSize, -1, ctx);
+                if (isExpFocused && ctx.containerSubCursor == ci + 1) {
+                    ctx.cursorDrawPosition.set(curX, expY);
+                    ctx.cursorHeight = expSize * 1.1f;
+                }
+            }
         }
 
-        return curX;
+        // Catat HitBox eksponen
+        if (ctx.containerHitBoxes != null) {
+            RenderContext.ContainerHitBox hitBox = new RenderContext.ContainerHitBox();
+            hitBox.tokenIndex = tokenIndex;
+            hitBox.isSecondary = true;
+            hitBox.bounds.set(expStartX, expY - emptyBoxH, curX, expY + (emptyBoxH * 0.5f));
+            hitBox.contentStartX = expStartX;
+            hitBox.contentWidth = curX - expStartX;
+            ctx.containerHitBoxes.add(hitBox);
+        }
+
+        return curX + (2f * ctx.density);
     }
 }

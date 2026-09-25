@@ -113,14 +113,14 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
         else if (id == R.id.btn_sqrt) displayContainer.appendSqrt();
         else if (id == R.id.btn_power) displayContainer.appendPower();
         else if (id == R.id.btn_square) {
-            // x² -> tambahkan power dengan eksponen 2
-            displayContainer.appendToken(MathToken.power(null, List.of(MathToken.number("2"))));
+            // x² -> tambahkan power kuadrat dengan basis ber-tanda kurung ( ... )²
+            displayContainer.appendSquare();
         } else if (id == R.id.btn_percent) displayContainer.appendText("%");
         else if (id == R.id.btn_paren_open) displayContainer.appendText("(");
         else if (id == R.id.btn_paren_close) displayContainer.appendText(")");
         else if (id == R.id.btn_reciprocal) {
-            // 1/x -> bentuk pecahan 1 di atas
-            displayContainer.appendToken(MathToken.fraction(List.of(MathToken.number("1")), null));
+            // 1/x -> bentuk pecahan dengan 1 di atas dan kursor di kotak penyebut bawah untuk mengisi x
+            displayContainer.appendReciprocal();
         }
 
         // 4. Tombol Kontrol Kursor & Edit
