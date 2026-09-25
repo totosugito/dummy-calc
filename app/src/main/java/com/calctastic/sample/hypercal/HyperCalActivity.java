@@ -149,19 +149,41 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
 
         StringBuilder sb = new StringBuilder();
         for (MathToken token : tokens) {
-            if (token.type == MathToken.Type.NUMBER) {
-                sb.append(token.text);
-            } else if (token.type == MathToken.Type.OPERATOR) {
-                sb.append(token.text);
-            } else if (token.type == MathToken.Type.FRACTION) {
-                StringBuilder num = new StringBuilder();
-                for (MathToken c : token.children) num.append(c.text != null ? c.text : "");
-                StringBuilder den = new StringBuilder();
-                for (MathToken c : token.secondaryChildren) den.append(c.text != null ? c.text : "");
-                sb.append("(").append(num).append("/").append(den).append(")");
-            }
+            sb.append(stringifyToken(token));
         }
 
         displayContainer.setResultPreview("= " + sb.toString());
+    }
+
+    private String stringifyToken(MathToken token) {
+        if (token == null) return "";
+        if (token.type == MathToken.Type.NUMBER || token.type == MathToken.Type.OPERATOR) {
+            return token.text != null ? token.text : "";
+        }
+        if (token.type == MathToken.Type.FRACTION) {
+            StringBuilder num = new StringBuilder();
+            for (MathToken c : token.children) num.append(stringifyToken(c));
+            StringBuilder den = new StringBuilder();
+            for (MathToken c : token.secondaryChildren) den.append(stringifyToken(c));
+            return "(" + num + "/" + den + ")";
+        }
+        if (token.type == MathToken.Type.SQRT) {
+            StringBuilder inner = new StringBuilder();
+            for (MathToken c : token.children) inner.append(stringifyToken(c));
+            return "√(" + inner + ")";
+        }
+        if (token.type == MathToken.Type.POWER) {
+            StringBuilder base = new StringBuilder();
+            for (MathToken c : token.children) base.append(stringifyToken(c));
+            StringBuilder exp = new StringBuilder();
+            for (MathToken c : token.secondaryChildren) exp.append(stringifyToken(c));
+            return base + "^(" + exp + ")";
+        }
+        if (token.type == MathToken.Type.PAREN_GROUP) {
+            StringBuilder inner = new StringBuilder();
+            for (MathToken c : token.children) inner.append(stringifyToken(c));
+            return "(" + inner + ")";
+        }
+        return "";
     }
 }

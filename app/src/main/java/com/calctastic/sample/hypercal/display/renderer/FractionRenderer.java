@@ -36,6 +36,63 @@ public class FractionRenderer implements MathTokenRenderer {
     }
 
     @Override
+    public MathBoxMetrics measureMetrics(MathToken token, float textSize, RenderContext ctx) {
+        float subSize = textSize * 0.8f;
+        ctx.textPaint.setTextSize(subSize);
+        float emptyBoxW = PlaceholderBoxRenderer.measureEmptyBoxWidth(ctx.textPaint);
+        float emptyBoxH = PlaceholderBoxRenderer.measureEmptyBoxHeight(ctx.textPaint, ctx.density);
+
+        float numW = 0f;
+        float numH = 0f;
+        float numAscent = 0f;
+        if (token.children.isEmpty()) {
+            numW = emptyBoxW;
+            numH = emptyBoxH;
+            numAscent = emptyBoxH / 2f;
+        } else {
+            for (MathToken c : token.children) {
+                MathBoxMetrics m = ctx.registry.measureMetrics(c, subSize, ctx);
+                numW += m.width;
+                numH = Math.max(numH, m.height);
+                numAscent = Math.max(numAscent, m.ascent);
+            }
+        }
+
+        float denW = 0f;
+        float denH = 0f;
+        float denAscent = 0f;
+        if (token.secondaryChildren.isEmpty()) {
+            denW = emptyBoxW;
+            denH = emptyBoxH;
+            denAscent = emptyBoxH / 2f;
+        } else {
+            for (MathToken c : token.secondaryChildren) {
+                MathBoxMetrics m = ctx.registry.measureMetrics(c, subSize, ctx);
+                denW += m.width;
+                denH = Math.max(denH, m.height);
+                denAscent = Math.max(denAscent, m.ascent);
+            }
+        }
+
+        // Qg.java line 113-129
+        ctx.textPaint.setTextSize(textSize);
+        float spaceW = ctx.textPaint.measureText(" ");
+        float padAboveBar = spaceW * 0.2f;
+        float barThickness = Math.max(2.2f * ctx.density, spaceW * 0.3f);
+        float padBelowBar = spaceW * 0.2f;
+
+        // Fraction bar diposisikan di baseline pecahan
+        // numY = baselineY - (numH - numAscent) - padAboveBar
+        // denY = baselineY + barThickness + padBelowBar + denAscent
+        float totalAscent = numH + padAboveBar + (barThickness / 2f);
+        float totalDescent = denH + padBelowBar + (barThickness / 2f);
+        float totalH = totalAscent + totalDescent;
+        float totalW = Math.max(numW, denW) + (16f * ctx.density);
+
+        return new MathBoxMetrics(totalW, totalH, totalAscent);
+    }
+
+    @Override
     public float draw(Canvas canvas, MathToken token, float x, float baselineY, float textSize, int tokenIndex, RenderContext ctx) {
         // Skala font pembilang & penyebut 0.8x (Qg.java line 37, 61)
         float subSize = textSize * 0.8f;
@@ -70,7 +127,7 @@ public class FractionRenderer implements MathTokenRenderer {
         // Gambar Garis Pecahan
         canvas.drawRect(x, lineY - (barThickness / 2f), x + fracW, lineY + (barThickness / 2f), ctx.mathAccentPaint);
 
-        boolean isThisFracFocused = (ctx.fractionFocusIndex == tokenIndex);
+        boolean isThisFracFocused = (ctx.targetFocusToken != null ? (ctx.targetFocusToken == token) : (ctx.fractionFocusIndex == tokenIndex));
 
         // --- 1. PEMBILANG (KOTAK ATAS) ---
         float numY = lineY - gapY;
@@ -137,6 +194,7 @@ public class FractionRenderer implements MathTokenRenderer {
         if (ctx.hitBoxes != null) {
             RenderContext.FractionHitBox hitBox = new RenderContext.FractionHitBox();
             hitBox.tokenIndex = tokenIndex;
+            hitBox.targetToken = token;
             float touchPad = 8f * ctx.density;
             hitBox.numBox.set(x - touchPad, lineY - (gapY * 2.2f), x + fracW + touchPad, lineY);
             hitBox.denBox.set(x - touchPad, lineY, x + fracW + touchPad, lineY + (gapY * 2.2f));

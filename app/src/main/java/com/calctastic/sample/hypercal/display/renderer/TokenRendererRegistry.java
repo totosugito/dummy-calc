@@ -33,6 +33,11 @@ public class TokenRendererRegistry {
         return getRenderer(token.type).measureWidth(token, textSize, ctx);
     }
 
+    public MathBoxMetrics measureMetrics(MathToken token, float textSize, RenderContext ctx) {
+        if (token == null) return new MathBoxMetrics();
+        return getRenderer(token.type).measureMetrics(token, textSize, ctx);
+    }
+
     public float draw(Canvas canvas, MathToken token, float x, float baselineY, float textSize, int tokenIndex, RenderContext ctx) {
         if (token == null) return x;
         return getRenderer(token.type).draw(canvas, token, x, baselineY, textSize, tokenIndex, ctx);

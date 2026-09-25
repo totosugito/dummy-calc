@@ -29,6 +29,16 @@ public class TextTokenRenderer implements MathTokenRenderer {
     }
 
     @Override
+    public MathBoxMetrics measureMetrics(MathToken token, float textSize, RenderContext ctx) {
+        ctx.textPaint.setTextSize(textSize);
+        float w = measureWidth(token, textSize, ctx);
+        Paint.FontMetrics fm = ctx.textPaint.getFontMetrics();
+        float ascent = -fm.ascent;
+        float height = -fm.ascent + fm.descent;
+        return new MathBoxMetrics(w, height, ascent);
+    }
+
+    @Override
     public float draw(Canvas canvas, MathToken token, float x, float baselineY, float textSize, int tokenIndex, RenderContext ctx) {
         ctx.textPaint.setTextSize(textSize);
 

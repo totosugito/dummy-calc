@@ -237,6 +237,7 @@ public class HiPerExpressionCanvasView extends View implements MathFormulaDocume
         renderContext.fractionSubCursor = document.getFractionSubCursor();
 
         renderContext.containerFocusIndex = document.getContainerFocusIndex();
+        renderContext.targetFocusToken = document.getContainerFocusToken();
         renderContext.containerInSecondary = document.isContainerInSecondary();
         renderContext.containerSubCursor = document.getContainerSubCursor();
 

@@ -24,8 +24,9 @@ public class MathFormulaDocument {
     private final List<MathToken> tokens = new ArrayList<>();
     private int cursorIndex = 0;
 
-    // Container focus (Fraction, Sqrt, Power)
+    // Container focus (Fraction, Sqrt, Power) - Sesuai C0157eA.java (node pointer)
     private int containerFocusIndex = -1;
+    private MathToken containerFocusToken = null;
     private boolean containerInSecondary = false; // true untuk penyebut (fraction) atau eksponen (power)
     private int containerSubCursor = 0;
 
@@ -53,6 +54,10 @@ public class MathFormulaDocument {
         return containerFocusIndex;
     }
 
+    public MathToken getContainerFocusToken() {
+        return containerFocusToken;
+    }
+
     public boolean isContainerInSecondary() {
         return containerInSecondary;
     }
@@ -63,6 +68,9 @@ public class MathFormulaDocument {
 
     // Kompatibilitas dengan fraction getters
     public int getFractionFocusIndex() {
+        if (containerFocusToken != null) {
+            return containerFocusToken.type == MathToken.Type.FRACTION ? containerFocusIndex : -1;
+        }
         if (containerFocusIndex >= 0 && containerFocusIndex < tokens.size()) {
             if (tokens.get(containerFocusIndex).type == MathToken.Type.FRACTION) {
                 return containerFocusIndex;
@@ -80,8 +88,11 @@ public class MathFormulaDocument {
     }
 
     private List<MathToken> getActiveTargetList() {
-        if (containerFocusIndex >= 0 && containerFocusIndex < tokens.size()) {
-            MathToken container = tokens.get(containerFocusIndex);
+        MathToken container = containerFocusToken;
+        if (container == null && containerFocusIndex >= 0 && containerFocusIndex < tokens.size()) {
+            container = tokens.get(containerFocusIndex);
+        }
+        if (container != null) {
             if (container.type == MathToken.Type.FRACTION || container.type == MathToken.Type.POWER) {
                 return containerInSecondary ? container.secondaryChildren : container.children;
             } else if (container.type == MathToken.Type.SQRT) {
@@ -173,6 +184,24 @@ public class MathFormulaDocument {
     }
 
     public void appendFraction() {
+        List<MathToken> target = getActiveTargetList();
+        if (target != null) {
+            MathToken prev = null;
+            if (containerSubCursor > 0 && containerSubCursor <= target.size()) {
+                prev = target.remove(containerSubCursor - 1);
+                containerSubCursor--;
+            }
+            List<MathToken> numList = new ArrayList<>();
+            if (prev != null) numList.add(prev);
+            MathToken fracToken = MathToken.fraction(numList, new ArrayList<>());
+            target.add(containerSubCursor, fracToken);
+            containerFocusToken = fracToken;
+            containerInSecondary = (prev != null);
+            containerSubCursor = 0;
+            notifyChange();
+            return;
+        }
+
         MathToken prev = null;
         if (cursorIndex > 0 && cursorIndex <= tokens.size()) {
             prev = tokens.remove(cursorIndex - 1);
@@ -188,6 +217,7 @@ public class MathFormulaDocument {
         tokens.add(cursorIndex, fracToken);
 
         containerFocusIndex = cursorIndex;
+        containerFocusToken = fracToken;
         if (prev != null) {
             containerInSecondary = true; // Langsung ke penyebut jika pembilang terisi angka sebelumnya
             containerSubCursor = 0;
@@ -200,6 +230,26 @@ public class MathFormulaDocument {
     }
 
     public void appendReciprocal() {
+        List<MathToken> target = getActiveTargetList();
+        if (target != null) {
+            MathToken prev = null;
+            if (containerSubCursor > 0 && containerSubCursor <= target.size()) {
+                prev = target.remove(containerSubCursor - 1);
+                containerSubCursor--;
+            }
+            List<MathToken> denList = new ArrayList<>();
+            if (prev != null) denList.add(prev);
+            List<MathToken> numList = new ArrayList<>();
+            numList.add(MathToken.number("1"));
+            MathToken fracToken = MathToken.fraction(numList, denList);
+            target.add(containerSubCursor, fracToken);
+            containerFocusToken = fracToken;
+            containerInSecondary = true;
+            containerSubCursor = denList.size();
+            notifyChange();
+            return;
+        }
+
         MathToken prev = null;
         if (cursorIndex > 0 && cursorIndex <= tokens.size()) {
             prev = tokens.remove(cursorIndex - 1);
@@ -219,6 +269,7 @@ public class MathFormulaDocument {
         tokens.add(cursorIndex, fracToken);
 
         containerFocusIndex = cursorIndex;
+        containerFocusToken = fracToken;
         containerInSecondary = true; // Kursor berada di penyebut (bawah) untuk mengisi nilai x
         containerSubCursor = denList.size();
 
@@ -226,15 +277,51 @@ public class MathFormulaDocument {
     }
 
     public void appendSqrt() {
+        List<MathToken> target = getActiveTargetList();
+        if (target != null) {
+            MathToken sqrtToken = MathToken.sqrt(new ArrayList<>());
+            target.add(containerSubCursor, sqrtToken);
+            containerFocusToken = sqrtToken;
+            containerInSecondary = false;
+            containerSubCursor = 0;
+            notifyChange();
+            return;
+        }
+
         MathToken sqrtToken = MathToken.sqrt(new ArrayList<>());
         tokens.add(cursorIndex, sqrtToken);
         containerFocusIndex = cursorIndex;
+        containerFocusToken = sqrtToken;
         containerInSecondary = false;
         containerSubCursor = 0;
         notifyChange();
     }
 
     public void appendPower() {
+        List<MathToken> target = getActiveTargetList();
+        if (target != null) {
+            MathToken prev = null;
+            if (containerSubCursor > 0 && containerSubCursor <= target.size()) {
+                prev = target.remove(containerSubCursor - 1);
+                containerSubCursor--;
+            }
+            List<MathToken> baseList = new ArrayList<>();
+            if (prev != null) {
+                if (prev.type == MathToken.Type.PAREN_GROUP) {
+                    baseList.add(prev);
+                } else {
+                    baseList.add(MathToken.paren(List.of(prev)));
+                }
+            }
+            MathToken powerToken = MathToken.power(baseList, new ArrayList<>());
+            target.add(containerSubCursor, powerToken);
+            containerFocusToken = powerToken;
+            containerInSecondary = true;
+            containerSubCursor = 0;
+            notifyChange();
+            return;
+        }
+
         MathToken prev = null;
         if (cursorIndex > 0 && cursorIndex <= tokens.size()) {
             prev = tokens.remove(cursorIndex - 1);
@@ -254,12 +341,35 @@ public class MathFormulaDocument {
         MathToken powerToken = MathToken.power(baseList, new ArrayList<>());
         tokens.add(cursorIndex, powerToken);
         containerFocusIndex = cursorIndex;
+        containerFocusToken = powerToken;
         containerInSecondary = true; // Fokus langsung ke kotak eksponen atas
         containerSubCursor = 0;
         notifyChange();
     }
 
     public void appendSquare() {
+        List<MathToken> target = getActiveTargetList();
+        if (target != null) {
+            MathToken prev = null;
+            if (containerSubCursor > 0 && containerSubCursor <= target.size()) {
+                prev = target.remove(containerSubCursor - 1);
+                containerSubCursor--;
+            }
+            List<MathToken> baseList = new ArrayList<>();
+            if (prev != null) {
+                if (prev.type == MathToken.Type.PAREN_GROUP) {
+                    baseList.add(prev);
+                } else {
+                    baseList.add(MathToken.paren(List.of(prev)));
+                }
+            }
+            MathToken powerToken = MathToken.power(baseList, List.of(MathToken.number("2")));
+            target.add(containerSubCursor, powerToken);
+            containerSubCursor++;
+            notifyChange();
+            return;
+        }
+
         MathToken prev = null;
         if (cursorIndex > 0 && cursorIndex <= tokens.size()) {
             prev = tokens.remove(cursorIndex - 1);
@@ -281,6 +391,7 @@ public class MathFormulaDocument {
         tokens.add(cursorIndex, powerToken);
         cursorIndex++;
         containerFocusIndex = -1;
+        containerFocusToken = null;
         containerInSecondary = false;
         containerSubCursor = 0;
         notifyChange();
@@ -306,6 +417,7 @@ public class MathFormulaDocument {
                 tokens.remove(containerFocusIndex);
                 cursorIndex = containerFocusIndex;
                 containerFocusIndex = -1;
+                containerFocusToken = null;
             }
             notifyChange();
             return;
@@ -327,6 +439,7 @@ public class MathFormulaDocument {
         tokens.clear();
         cursorIndex = 0;
         containerFocusIndex = -1;
+        containerFocusToken = null;
         containerInSecondary = false;
         containerSubCursor = 0;
         notifyChange();
@@ -334,7 +447,7 @@ public class MathFormulaDocument {
 
     public void moveCursorLeft() {
         if (containerFocusIndex >= 0 && containerFocusIndex < tokens.size()) {
-            MathToken container = tokens.get(containerFocusIndex);
+            MathToken container = containerFocusToken != null ? containerFocusToken : tokens.get(containerFocusIndex);
             if (containerSubCursor > 0) {
                 containerSubCursor--;
             } else if (container.type == MathToken.Type.FRACTION && containerInSecondary) {
@@ -343,6 +456,7 @@ public class MathFormulaDocument {
             } else {
                 cursorIndex = containerFocusIndex;
                 containerFocusIndex = -1;
+                containerFocusToken = null;
             }
             notifyChange();
             return;
@@ -353,14 +467,17 @@ public class MathFormulaDocument {
             MathToken prev = tokens.get(cursorIndex);
             if (prev.type == MathToken.Type.FRACTION) {
                 containerFocusIndex = cursorIndex;
+                containerFocusToken = prev;
                 containerInSecondary = true;
                 containerSubCursor = prev.secondaryChildren.size();
             } else if (prev.type == MathToken.Type.SQRT) {
                 containerFocusIndex = cursorIndex;
+                containerFocusToken = prev;
                 containerInSecondary = false;
                 containerSubCursor = prev.children.size();
             } else if (prev.type == MathToken.Type.POWER) {
                 containerFocusIndex = cursorIndex;
+                containerFocusToken = prev;
                 containerInSecondary = true;
                 containerSubCursor = prev.secondaryChildren.size();
             }
@@ -370,7 +487,7 @@ public class MathFormulaDocument {
 
     public void moveCursorRight() {
         if (containerFocusIndex >= 0 && containerFocusIndex < tokens.size()) {
-            MathToken container = tokens.get(containerFocusIndex);
+            MathToken container = containerFocusToken != null ? containerFocusToken : tokens.get(containerFocusIndex);
             List<MathToken> target = getActiveTargetList();
             if (target != null && containerSubCursor < target.size()) {
                 containerSubCursor++;
@@ -380,6 +497,7 @@ public class MathFormulaDocument {
             } else {
                 cursorIndex = containerFocusIndex + 1;
                 containerFocusIndex = -1;
+                containerFocusToken = null;
             }
             notifyChange();
             return;
@@ -389,14 +507,17 @@ public class MathFormulaDocument {
             MathToken next = tokens.get(cursorIndex);
             if (next.type == MathToken.Type.FRACTION) {
                 containerFocusIndex = cursorIndex;
+                containerFocusToken = next;
                 containerInSecondary = false;
                 containerSubCursor = 0;
             } else if (next.type == MathToken.Type.SQRT) {
                 containerFocusIndex = cursorIndex;
+                containerFocusToken = next;
                 containerInSecondary = false;
                 containerSubCursor = 0;
             } else if (next.type == MathToken.Type.POWER) {
                 containerFocusIndex = cursorIndex;
+                containerFocusToken = next;
                 containerInSecondary = true;
                 containerSubCursor = 0;
             } else {
@@ -412,10 +533,16 @@ public class MathFormulaDocument {
         // Cek klik pada wadah pecahan (pembilang / penyebut)
         if (hitBoxes != null) {
             for (RenderContext.FractionHitBox box : hitBoxes) {
+                MathToken frac = box.targetToken;
+                if (frac == null && box.tokenIndex >= 0 && box.tokenIndex < tokens.size()) {
+                    frac = tokens.get(box.tokenIndex);
+                }
+                if (frac == null) continue;
+
                 if (box.numBox.contains(touchX, touchY)) {
                     containerFocusIndex = box.tokenIndex;
+                    containerFocusToken = frac;
                     containerInSecondary = false;
-                    MathToken frac = tokens.get(box.tokenIndex);
                     if (frac.children.isEmpty()) {
                         containerSubCursor = 0;
                     } else {
@@ -427,8 +554,8 @@ public class MathFormulaDocument {
                     return;
                 } else if (box.denBox.contains(touchX, touchY)) {
                     containerFocusIndex = box.tokenIndex;
+                    containerFocusToken = frac;
                     containerInSecondary = true;
-                    MathToken frac = tokens.get(box.tokenIndex);
                     if (frac.secondaryChildren.isEmpty()) {
                         containerSubCursor = 0;
                     } else {
@@ -446,9 +573,15 @@ public class MathFormulaDocument {
         if (containerHitBoxes != null) {
             for (RenderContext.ContainerHitBox box : containerHitBoxes) {
                 if (box.bounds.contains(touchX, touchY)) {
+                    MathToken token = box.targetToken;
+                    if (token == null && box.tokenIndex >= 0 && box.tokenIndex < tokens.size()) {
+                        token = tokens.get(box.tokenIndex);
+                    }
+                    if (token == null) continue;
+
                     containerFocusIndex = box.tokenIndex;
+                    containerFocusToken = token;
                     containerInSecondary = box.isSecondary;
-                    MathToken token = tokens.get(box.tokenIndex);
                     List<MathToken> target = box.isSecondary ? token.secondaryChildren : token.children;
                     if (target.isEmpty()) {
                         containerSubCursor = 0;
@@ -465,6 +598,7 @@ public class MathFormulaDocument {
 
         // Klik di ekspresi utama (luar wadah)
         containerFocusIndex = -1;
+        containerFocusToken = null;
         int nearestIndex = tokens.size();
         float minDiff = Float.MAX_VALUE;
 

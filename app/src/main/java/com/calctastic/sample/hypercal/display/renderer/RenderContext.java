@@ -23,6 +23,7 @@ public class RenderContext {
 
     // General Container State (Fraction, Sqrt, Power)
     public int containerFocusIndex = -1;
+    public MathToken targetFocusToken = null;
     public boolean containerInSecondary = false;
     public int containerSubCursor = 0;
 
@@ -35,6 +36,7 @@ public class RenderContext {
 
     public static class FractionHitBox {
         public int tokenIndex;
+        public MathToken targetToken;
         public android.graphics.RectF numBox = new android.graphics.RectF();
         public android.graphics.RectF denBox = new android.graphics.RectF();
         public float numStartX;
@@ -45,6 +47,7 @@ public class RenderContext {
 
     public static class ContainerHitBox {
         public int tokenIndex;
+        public MathToken targetToken;
         public boolean isSecondary;
         public android.graphics.RectF bounds = new android.graphics.RectF();
         public float contentStartX;

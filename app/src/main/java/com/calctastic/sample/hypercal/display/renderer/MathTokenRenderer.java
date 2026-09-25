@@ -13,6 +13,11 @@ public interface MathTokenRenderer {
     float measureWidth(MathToken token, float textSize, RenderContext ctx);
 
     /**
+     * Menghitung metrik kotak visual (width, height, ascent) persis seperti mo63HiPER() pada AbstractC0335wD.
+     */
+    MathBoxMetrics measureMetrics(MathToken token, float textSize, RenderContext ctx);
+
+    /**
      * Menggambar token pada posisi (x, baselineY) dan mengembalikan koordinat X ujung kanan token.
      */
     float draw(Canvas canvas, MathToken token, float x, float baselineY, float textSize, int tokenIndex, RenderContext ctx);
