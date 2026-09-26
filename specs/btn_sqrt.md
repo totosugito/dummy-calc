@@ -129,6 +129,18 @@ reminder to crop generously when checking a NEW vertical extent, not just the pr
 one). Fixed by using the FULL `degreeHeight` for `vinculumY` (no overlap), keeping the degree's
 top pinned at exactly 0.
 
+**Follow-up (2026-09-26): flush-top looked disconnected, user wanted left + vertically centered.**
+Pinning the degree flush at `y=0` (bottom exactly touching the vinculum) matched the earlier
+reference image's "stay above the radical" requirement but not its exact placement -- the
+reference showed the degree sitting to the LEFT of the tick's own start and roughly vertically
+centered over its rising stroke, not flush against the very top edge. Fixed by reserving MORE
+vertical room than the degree strictly needs (`vinculumY = degreeHeight * 1.35f` instead of
+`1.0f`) and centering the degree within that band (`y = (vinculumY - degreeHeight) / 2`), and by
+introducing `degreeLeftShift = degreeWidth * 0.35f` that pushes the TICK's own `startX` right by
+that amount (rather than giving the degree a negative x, which would repeat the exact clipping
+bug just described) so the degree visually sits to the left of the tick instead of directly above
+its start.
+
 ## UI
 
 Added `btn_nth_root` (label `"ⁿ√x"`) to `activity_hypercal.xml`, in the same row as `btn_sqrt`

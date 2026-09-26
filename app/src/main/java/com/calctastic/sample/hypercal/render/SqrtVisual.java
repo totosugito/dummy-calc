@@ -88,16 +88,20 @@ public class SqrtVisual extends MathVisual {
         thickness = Math.max(1.6f, paint.getTextSize() * 0.05f);
         contentGap = radicandH * 0.12f;
 
-        // The degree sits entirely above the vinculum, flush with this visual's own top (y=0) --
-        // the vinculum itself is pushed down by the degree's full height to make room. Using
-        // anything less than the FULL degreeHeight here made the degree's top go negative (outside
-        // this visual's own declared bounding box), which got silently clipped by whatever drew
-        // above it (found 2026-09-26 on first real on-device check of the degree slot, see
-        // specs/btn_sqrt.md) -- MathVisual has no notion of a child rendering "outside" its own
-        // [0, b.y] box, so that space must actually be reserved, not just implied.
-        vinculumY = degreeVisual != null ? degreeHeight : 0.0f;
+        // The degree sits entirely above the vinculum (never overlapping it -- see the clipping
+        // note below), but vertically CENTERED within that reserved band rather than flush with
+        // this visual's own top, and shifted slightly to the LEFT of the tick's own start (by
+        // pushing the tick's startX right instead of giving the degree a negative x, for the same
+        // reason as the vertical fix: a negative coordinate is silently clipped, since MathVisual
+        // has no notion of a child rendering outside its own declared [0, b.y]/[0, b.x] box).
+        // Reserving MORE than the degree's own height (1.35x) leaves room to center it instead of
+        // pinning it flush top or flush bottom -- pinning it flush top was the very first version
+        // and looked disconnected from the radical sign; the user's own reference showed it
+        // hugging the tick, roughly centered over its rising stroke.
+        float degreeLeftShift = degreeVisual != null ? degreeWidth * 0.35f : 0.0f;
+        vinculumY = degreeVisual != null ? degreeHeight * 1.35f : 0.0f;
 
-        float totalW = tickWidth + contentGap + radicandW + (thickness * 0.5f);
+        float totalW = degreeLeftShift + tickWidth + contentGap + radicandW + (thickness * 0.5f);
         float totalH = vinculumY + tickHeight;
 
         // Radical bar baseline alignment
@@ -105,12 +109,11 @@ public class SqrtVisual extends MathVisual {
         this.m = fRadicandBaseline;
 
         // Position children
-        startX = 0;
+        startX = degreeLeftShift;
         if (degreeVisual != null) {
-            // Flush with the top (y=0); its bottom edge lands exactly at the vinculum's height
-            // (vinculumY == degreeHeight), near the LEFT of the tick (above its rising stroke)
-            // rather than pushing the whole tick rightward the way a same-line prefix would.
-            degreeVisual.setPosition(0, 0);
+            // Vertically centered in [0, vinculumY]; horizontally flush at x=0, i.e. shifted left
+            // of the tick's own start (startX) by degreeLeftShift.
+            degreeVisual.setPosition(0, (vinculumY - degreeHeight) / 2.0f);
         }
 
         float radicandX = startX + tickWidth + contentGap;
