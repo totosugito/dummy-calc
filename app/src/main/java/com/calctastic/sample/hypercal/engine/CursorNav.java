@@ -73,15 +73,38 @@ public final class CursorNav {
     /**
      * True when {@code seq} is an editable slot owned by some wrapper node (fraction, power,
      * sqrt, parenthesis) -- see specs/editable_slots_sequencenode.md. Such a slot must never be
-     * left with zero children: emptying it out should refill it with a single EmptyNode
-     * placeholder instead, the same way a fraction's numerator/denominator already do. This is
-     * false for a "plain" sequence that isn't anyone's slot (e.g. the expression root), which is
-     * allowed to genuinely have zero children.
+     * left with zero children: emptying it out should refill it with a single empty placeholder
+     * instead (see {@link #freshPlaceholder}), the same way a fraction's numerator/denominator
+     * already do. This is false for a "plain" sequence that isn't anyone's slot (e.g. the
+     * expression root), which is allowed to genuinely have zero children.
      */
     public static boolean isWrapperSlot(SequenceNode seq) {
-        ExpressionNode owner = seq.getParent();
+        return isWrapperSlot(seq.getParent());
+    }
+
+    private static boolean isWrapperSlot(ExpressionNode owner) {
         return owner instanceof FractionNode || owner instanceof PowerNode
                 || owner instanceof SqrtNode || owner instanceof ParenthesisNode;
+    }
+
+    /**
+     * The right kind of empty placeholder to refill {@code seq} with once it's been emptied out,
+     * matching whichever convention its owner already uses elsewhere -- NOT a single hardcoded
+     * choice. Fraction slots (numerator/denominator/integerPart) use {@code EmptyNode} (`QA`);
+     * everywhere else that's SequenceNode-wrapped now (power base/exponent, sqrt radicand/degree,
+     * parenthesis content) uses a plain empty {@code NumberNode}, per the convention noted in
+     * specs/btn_1_per_x.md. Mixing these up is a real bug that shipped once (2026-09-26, see
+     * specs/btn_x_power_y.md Section N): refilling a power/sqrt/parenthesis slot with an
+     * {@code EmptyNode} instead makes it render via {@code PlaceholderVisual}'s box formula
+     * instead of {@code NumberVisual}'s -- a visibly different (and, since Section M, differently
+     * SIZED) box popping up after DEL than the one the button itself would have created fresh.
+     */
+    public static ExpressionNode freshPlaceholder(SequenceNode seq) {
+        ExpressionNode owner = seq.getParent();
+        if (owner instanceof FractionNode) {
+            return new EmptyNode();
+        }
+        return new NumberNode("");
     }
 
     /**
@@ -266,8 +289,26 @@ public final class CursorNav {
     }
 
     /**
+     * True when {@code node} is an empty placeholder standing in for "nothing typed here yet" --
+     * either an {@code EmptyNode} (QA, used by fraction slots) or a {@code NumberNode} with no
+     * text (the convention used by xʸ/x²/x³/x⁻¹/√/parenthesis's base/exponent/radicand/content
+     * slots, see specs/btn_x_power_y.md). Both represent the same thing and should be replaced,
+     * not left behind as an empty sibling, when a new compound token is inserted at the cursor.
+     */
+    private static boolean isEmptyPlaceholder(ExpressionNode node) {
+        return node instanceof EmptyNode || (node instanceof NumberNode && node.getLength() == 0);
+    }
+
+    /**
      * Inserts a new token at the cursor inside the cursor's own sequence.
-     * An EmptyNode placeholder under the cursor is replaced (QA -> real token).
+     * An empty placeholder under the cursor is replaced (QA, or an empty NumberNode -> real
+     * token), rather than left behind as an invisible-but-still-there empty sibling. Missing this
+     * for empty NumberNode used to be a real bug (2026-09-26): pressing xʸ again with the cursor
+     * in a fresh, still-empty exponent (itself created by a previous xʸ) inserted the new nested
+     * PowerNode as a SIBLING of the old empty NumberNode instead of replacing it -- invisible in
+     * the debug LaTeX (an empty NumberNode's toLatexString() is "", so `5^{^{}}` looked correct),
+     * but a real extra empty box rendered next to the nested power. See
+     * specs/editable_slots_sequencenode.md and specs/btn_x_power_y.md Section L.
      */
     public static void insertAtCursor(SequenceNode rootSequence, CursorPointer cursorPointer, ExpressionNode node) {
         if (cursorPointer == null || cursorPointer.node == null) {
@@ -284,7 +325,7 @@ public final class CursorNav {
         if (parent instanceof SequenceNode) {
             SequenceNode seq = (SequenceNode) parent;
             int idx = seq.getChildIndex(cursorPointer.node);
-            if (cursorPointer.node instanceof EmptyNode) {
+            if (isEmptyPlaceholder(cursorPointer.node)) {
                 seq.removeChild(cursorPointer.node);
                 seq.add(idx, node);
                 return;

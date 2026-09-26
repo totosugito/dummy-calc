@@ -1,6 +1,5 @@
 package com.calctastic.sample.hypercal.render;
 
-import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.PointF;
@@ -25,22 +24,27 @@ public class NumberVisual extends MathVisual {
 
         String text = numberNode.getText();
         if (text.isEmpty()) {
-            // Empty box, same formula as PlaceholderVisual (C0357yG.mo63HiPER()) so an empty
-            // "x^y" base/exponent (or sqrt/parenthesis content) reads as a placeholder box just
-            // like an empty a/b slot, instead of silently taking up half a digit's width.
+            // Empty box, so an empty "x^y" base/exponent (or sqrt/parenthesis content) reads as a
+            // placeholder just like an empty a/b slot, instead of silently taking up no space.
             //
-            // Deviation from C0357yG: its "0.9f * density" term is a FIXED device-pixel value
-            // that does NOT shrink with scale -- confirmed faithful for a top-level a/b slot,
-            // but C0294rh (the real NumberVisual) never draws a box for an empty number at all,
-            // and C0311tf (exponent layout) has no empty-placeholder handling either -- so this
-            // exact combination (empty box inside a scaled-down exponent, e.g. 0.75x for xʸ) has
-            // no original behavior to match. Left un-scaled, that fixed term dominates a small
-            // exponent's box and makes it look oversized. We scale it by D so the box shrinks
-            // proportionally with its own element scale instead.
-            float density = Resources.getSystem().getDisplayMetrics().density;
-            b.x = paint.measureText("0") * 1.2f;
-            m = -paint.ascent() + 0.9f * density * D;
-            b.y = paint.descent() + m;
+            // Sized to match a plain digit's own visual footprint at this visual's scale (D),
+            // rather than the fraction placeholder's C0357yG-derived formula (measureText("0") *
+            // 1.2f width, plus a "0.9f * density" padding term) -- that formula is faithful for a
+            // top-level a/b slot, but produces a box visibly LARGER than an actual digit once
+            // scaled down for a superscript (e.g. an empty "^y" noticeably bigger than an actual
+            // "^2" at the same D). C0294rh (the real NumberVisual) never draws a box for an empty
+            // number at all, so there's no original formula to match here regardless -- this is a
+            // deliberate choice to size it like "the digit that could go here" instead.
+            //
+            // Height is ascent-to-baseline only (no descent tail): a digit like "2" has no
+            // descender, so its actual ink never reaches the descent line even though a real
+            // NumberVisual's b.y (below) reports the full ascent+descent line-height for baseline
+            // bookkeeping. Drawing the placeholder rect that same full height made it visibly
+            // taller than the digit it's standing in for -- the box's bottom edge should land on
+            // the baseline, matching where "2"'s own bottom actually sits.
+            b.x = paint.measureText("0");
+            m = -paint.ascent();
+            b.y = m;
             return;
         }
 

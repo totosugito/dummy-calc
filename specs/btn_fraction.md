@@ -342,11 +342,13 @@ implementation.
     Reference `C0196hc.java` lines 347–363 remains inconclusive (evaluation-transformation code, not
     the button action itself), so this is a design decision based on spec-rule consistency, not
     direct decompile evidence.
-- [x] **Task 19: Fraction unwrapping** on DEL at Center after the fraction.
+- [x] **Task 19: Fraction unwrapping** on DEL at Center after the fraction. **SUPERSEDED
+  2026-09-26, see Section J** — DEL at Center-after-fraction no longer unwraps; it deletes the
+  whole fraction outright, regardless of denominator content. Left here for history.
   - Empty denominator → the fraction is replaced by the numerator's content, cursor at the end of
     that content (numerator also empty → the fraction is deleted). Denominator has content →
     cursor moves into the end of the denominator (as before).
-  - Test: `5 a/b ▶ DEL 3` → `53`; `2 + a/b 1 ▶ ▶ DEL` → `2 + 1`.
+  - Test: `5 a/b ▶ DEL 3` → `53`; `2 + a/b 1 ▶ ▶ DEL` → `2 + 1`. **No longer holds** — see Section J.
 
 ### C. Priority Order
 1. ~~**Behavior (directly felt by the user):** Task 20 → Task 19 → Task 12 → verify left/right tap
@@ -456,3 +458,142 @@ verification for the operator navigation bug) — everything identical, no behav
 **When looking for related code now:** fraction/power buttons are in `engine/inserter/`; ◀/▶
 navigation (and shared slot helpers) are in `engine/CursorNav.java`; DEL/backspace is in
 `engine/CursorDelete.java`; `ExpressionEditor.java` is just thin orchestration.
+
+### I. Bug found & fixed (2026-09-26): DEL right after a fraction was a dead keystroke
+
+User feedback: pressing DEL with the cursor at Center-after-a-fraction (e.g. right after `1/2`)
+seemed to do nothing, or seemed to be "deleting the denominator" in a confusing way — not the
+outright "delete the whole fraction in one press" they expected. Investigated with the LaTeX-dump
+technique (`specs/testing_via_latex.md`): `1/2`, cursor after the fraction, pressing DEL repeatedly
+on `\frac{1}{2}` produced `\frac{1}{2}` (unchanged!) → `\frac{1}{\square}` → `\frac{1}{\square}`
+(unchanged again!) → `\frac{\square}{\square}` → finally removed. Two of those four presses did
+nothing visible at all.
+
+**Verdict on "should one DEL delete the whole fraction" — SUPERSEDED 2026-09-26, see Section J:**
+at the time, the call here was no — too destructive, and inconsistent with `√`/`(...)`/powers which
+(it was assumed) all unwrap gradually. That assumption about powers was wrong: `PowerNode` already
+had no unwrap logic at all (see `btn_x_power_y.md` Section L's "not fixed" note, since corrected) —
+DEL right after a power always deleted the whole thing outright, simply because `CursorDelete` never
+had a dedicated case for it. Once that was pointed out, the decision was reversed: DEL right after a
+fraction now deletes the whole fraction too, for consistency — see Section J. The paragraph below
+(the dead-keystroke fix) is still correct as a fix, but two of the three spots it patched no longer
+run through the code path they originally targeted; see Section J for what changed.
+
+**But the "does nothing" presses were a real bug**, the same class already fixed for operators in
+`specs/operator_cursor_nav.md`: `CursorDelete.deleteChar()`'s `FractionNode` branch, on finding a
+non-empty denominator, just returned `CursorNav.endOf(frac.denominator)` — repositioning the
+cursor into the denominator without deleting anything. The very next DEL press would then actually
+delete a character, but the user has no way to know that from the first, seemingly-inert press.
+The mirror case (DEL on an empty denominator jumping to the end of the numerator, and the
+mixed-number "jump to the end of the integer part" case) had the identical issue.
+
+**Fix:** new private helper `CursorDelete.enterAndDelete(CursorPointer target)` — if the slot's
+last token is a plain, non-empty `NumberNode`, delete its last character immediately instead of
+just moving the cursor there; otherwise (the last token is itself a compound — a nested fraction,
+power, etc.) just enter it as before, since reaching through multiple nested levels in one press
+would be a separate, more surprising behavior change. Applied at the three spots that used to just
+reposition: Center-after-fraction → denominator, empty-denominator → numerator, and
+mixed-number empty-numerator → integer part.
+
+**Verified on emulator:** `1/2`, cursor after the fraction, DEL now goes
+`\frac{1}{2}` → `\frac{1}{\square}` → `\frac{\square}{\square}` → removed, in exactly 3 presses,
+each one visibly deleting something. Mixed number `1 2/3` behaves the same way (denominator →
+numerator → integer part → whole thing, one visible deletion per press, no dead presses in
+between).
+
+### J. Design change (2026-09-26): DEL right after a fraction now deletes the whole fraction, matching Power — supersedes Task 19 and part of Section I
+
+User pushed back on Section I's verdict: pointed out that `xʸ`/`x²` etc. already delete the whole
+power in one DEL press when the cursor sits right after them (`5^{2}|` → DEL → nothing left), and
+asked why a fraction shouldn't work the same way — if you want to edit just the denominator, you
+can position the cursor there directly (tap, or ◀/▶) rather than relying on DEL to "enter" it for
+you.
+
+Checked: Power's one-shot-delete wasn't actually a deliberate design either — `CursorDelete` simply
+never had a dedicated case for `PowerNode`, so any cursor sitting directly on one (either boundary
+position) fell through to the generic "delete the whole node" fallback. So the fraction's gradual
+unwrap (Task 19) and the power's outright delete were never a consistent pair of decisions to begin
+with — one was designed, the other was an accident of what code existed. Given a choice between the
+two for consistency, the simpler, more predictable rule won: **DEL at Center-after a compound
+deletes the whole thing outright; editing its content requires positioning the cursor explicitly
+inside first.** This is also arguably more standard backspace semantics: at Center-after, the
+compound is what's immediately behind the cursor, so deleting it is exactly "delete what's behind
+me" — no different in kind from deleting a plain digit that's behind the cursor.
+
+**What changed:**
+- `CursorDelete.deleteChar()`'s `FractionNode` branch: position 1 (Center-after) now
+  unconditionally calls `removeFromSequence(frac, cursorPointer)`, regardless of denominator
+  content. The `FractionNode.isEmptySlot(frac.denominator)` check and the call into
+  `unwrapFraction()` were removed from this branch.
+- `unwrapFraction()` itself was deleted entirely (along with its now-unused `ArrayList`/`List`
+  imports) — it had exactly one caller, this branch.
+- Position 0 (Center-before, `deleteBefore(frac, ...)`) is unchanged: DEL there still deletes
+  whatever token precedes the fraction, not the fraction itself — this is the correct, standard
+  backspace behavior and was never in question.
+
+**What did NOT change:** Section I's `enterAndDelete()` fix is still in place and still needed, but
+now only fires for the two spots where the cursor is already resting on an empty slot reached by
+*manual* navigation (tap, or ◀/▶ into the numerator/denominator/integer part) — not via DEL
+auto-entering from Center-after anymore:
+- DEL on an empty denominator (cursor manually placed there) → deletes the numerator's last
+  character immediately, rather than just moving there.
+- DEL on an empty numerator in a mixed number (cursor manually placed there, denominator empty too)
+  → deletes the integer part's last character immediately.
+
+So once you've manually navigated inside a fraction, DEL still edits it character-by-character with
+no dead presses (Section I's fix); it's only the *automatic entry* from Center-after that's gone.
+
+**Known behavior change from a previously-documented/tested case:** Task 19's test
+`5 a/b ▶ DEL 3 → 53` (denominator empty, unwrap preserves the numerator's "5") no longer holds —
+that exact sequence now produces `3` (the whole fraction, including the "5", is deleted by DEL,
+then "3" is typed fresh). This is intentional given the new design, not a regression to fix.
+
+**Verified on emulator:**
+- `1/2`, cursor after the fraction, DEL → `` (empty) in **one** press (was 3 presses under
+  Section I's design).
+- `2 + 1/2`, cursor after the fraction, DEL → `2 + ` in one press.
+- Manually tapping into the denominator (not via Center-after) and pressing DEL still edits
+  character-by-character as before: `1/2` → tap denominator → DEL → `\frac{1}{\square}` → DEL →
+  `\frac{\square}{\square}` (Section I's fix still applies here, unaffected).
+
+### K. Bug found & fixed (2026-09-26): DEL left the cursor on the wrong side of the operator
+
+Found while verifying Section J: `2 + a/b` (empty fraction) → DEL removed the fraction correctly,
+but the cursor ended up rendered as `2| +` (between `2` and `+`) instead of `2 + |` (right after the
+`+`, where the deleted fraction used to be) — confirmed the same symptom on power (`2 + xʸ` → DEL →
+same misplaced cursor).
+
+**Root cause:** `CursorDelete.removeFromSequence()` computes the cursor position after removing a
+node by calling `CursorNav.afterNode(precedingSibling)`. When the preceding sibling is an
+`OperatorNode`, `afterNode()` deliberately returns a single fixed position for it (position 0) —
+per `specs/operator_cursor_nav.md`, operators aren't supposed to have their own distinguishable
+before/after position. But that position 0 *renders* as just BEFORE the operator (the default
+`MathVisual` left/right split: index ≤ 0 → left of the node), not after — so naming this call
+`afterNode()` was misleading for this particular caller: it does NOT put the cursor after the
+operator, it puts it before. This wasn't a problem anywhere `afterNode()` was already used (normal
+◀/▶ navigation never calls it directly on an operator — `CursorNav.moveLeft`/`moveRight` explicitly
+skip over operators first), but `removeFromSequence` had no such skip logic and called it on the
+operator directly.
+
+**Fix:** `removeFromSequence()` now special-cases a preceding `OperatorNode`: instead of
+`afterNode(operatorNode)`, it returns a plain sequence-position `CursorPointer(seq, idx)` at the
+deleted node's original index — this renders correctly, right after the operator, without needing
+to treat the operator itself as a cursor stop. Non-operator preceding siblings are unaffected (still
+`afterNode(prev)`, which correctly lands cursor at the end of that token so subsequent typing
+extends it — e.g. continuing to type more digits into a preceding number).
+
+**Verified on emulator:** `2 + a/b` → DEL → type a digit → `2 + 3` (not `23 +`); `2 + xʸ` → DEL →
+type a digit → `2 + 3`. Screenshot confirms the cursor caret renders immediately to the right of
+`+`.
+
+### L. Known remaining inconsistency (not fixed, flagged 2026-09-26)
+
+`CursorDelete.deleteChar()` has no position-aware dispatch at all for `PowerNode`, `SqrtNode`, or
+`ParenthesisNode` — a cursor sitting directly on one of these nodes at EITHER boundary position (0
+or 1) falls through to the same "delete the whole node" fallback. Fraction is the only one of the
+four compound types that distinguishes: position 0 → `deleteBefore` (delete whatever precedes it,
+correct standard backspace semantics), position 1 → delete the whole node (Section J). For
+power/sqrt/parenthesis, DEL at position 0 (cursor to the LEFT of the node, about to delete whatever
+is behind it) currently also deletes the whole node instead of the token that actually precedes it
+— inconsistent with fraction, and arguably wrong by the same "delete what's behind the cursor"
+standard this section just used to justify Section J. Not fixed yet — flagged for a future task.

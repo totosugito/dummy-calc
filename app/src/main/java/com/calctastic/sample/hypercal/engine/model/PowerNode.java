@@ -27,17 +27,26 @@ public class PowerNode extends ExpressionNode {
         this.operationName = operationName != null ? operationName : "xʸ";
     }
 
-    /** Wraps a bare node into a SequenceNode slot (an empty slot holds a single EmptyNode). */
+    /**
+     * Wraps a bare node into a SequenceNode slot. An empty slot holds a single empty
+     * {@code NumberNode} -- NOT {@code EmptyNode} (that's the fraction-slot convention, see
+     * {@link FractionNode#toSlot}) -- matching how every power base/exponent is actually created
+     * elsewhere (PowerInserter always passes a real, possibly-empty NumberNode, never null or an
+     * empty SequenceNode, so this fallback is currently unreached dead code -- but see
+     * specs/btn_x_power_y.md Section N for why getting this wrong is a real, visible bug the
+     * moment something DOES hit it: a mismatched placeholder type renders via the wrong visual
+     * class, at the wrong box size).
+     */
     private static SequenceNode toSlot(ExpressionNode node) {
         if (node instanceof SequenceNode) {
             SequenceNode seq = (SequenceNode) node;
             if (seq.getChildCount() == 0) {
-                seq.add(new EmptyNode());
+                seq.add(new NumberNode(""));
             }
             return seq;
         }
         SequenceNode seq = new SequenceNode();
-        seq.add(node != null ? node : new EmptyNode());
+        seq.add(node != null ? node : new NumberNode(""));
         return seq;
     }
 

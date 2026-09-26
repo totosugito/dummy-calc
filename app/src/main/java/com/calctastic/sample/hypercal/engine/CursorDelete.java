@@ -5,13 +5,11 @@ import com.calctastic.sample.hypercal.engine.model.EmptyNode;
 import com.calctastic.sample.hypercal.engine.model.ExpressionNode;
 import com.calctastic.sample.hypercal.engine.model.FractionNode;
 import com.calctastic.sample.hypercal.engine.model.NumberNode;
+import com.calctastic.sample.hypercal.engine.model.OperatorNode;
 import com.calctastic.sample.hypercal.engine.model.ParenthesisNode;
 import com.calctastic.sample.hypercal.engine.model.PowerNode;
 import com.calctastic.sample.hypercal.engine.model.SequenceNode;
 import com.calctastic.sample.hypercal.engine.model.SqrtNode;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * DEL/backspace logic: deleting one character or token, including the fraction unwrap/nesting
@@ -49,10 +47,11 @@ public final class CursorDelete {
         if (node instanceof FractionNode) {
             FractionNode frac = (FractionNode) node;
             if (cursorPointer.position == 1) {
-                if (FractionNode.isEmptySlot(frac.denominator)) {
-                    return unwrapFraction(frac, cursorPointer);
-                }
-                return CursorNav.endOf(frac.denominator);
+                // Center after the fraction: DEL removes the whole fraction outright, matching
+                // Power/Sqrt/Parenthesis, which already behave this way at their own Center-after
+                // position. Editing numerator/denominator content requires positioning the cursor
+                // explicitly INSIDE the fraction first (tap or ◀/▶), not via DEL auto-entering it.
+                return removeFromSequence(frac, cursorPointer);
             }
             return deleteBefore(frac, cursorPointer);
         }
@@ -75,15 +74,16 @@ public final class CursorDelete {
                 }
                 return removeFromSequence(node, cursorPointer);
             } else if (node.getParent() == frac.denominator) {
-                // DEL in empty denominator jumps to the end of the numerator
-                return CursorNav.endOf(frac.numerator);
+                // DEL in empty denominator deletes the numerator's last character
+                return enterAndDelete(CursorNav.endOf(frac.numerator));
             } else if (frac.isMixed() && node.getParent() == frac.numerator) {
-                // DEL in empty numerator (mixed number) jumps to the end of the integer part,
-                // unless the denominator is filled -- then keep the numerator box visible.
+                // DEL in empty numerator (mixed number) deletes the integer part's last
+                // character, unless the denominator is filled -- then keep the numerator box
+                // visible.
                 if (!FractionNode.isEmptySlot(frac.denominator)) {
                     return new CursorPointer(frac, 0);
                 } else if (!FractionNode.isEmptySlot(frac.integerPart)) {
-                    return CursorNav.endOf(frac.integerPart);
+                    return enterAndDelete(CursorNav.endOf(frac.integerPart));
                 } else {
                     return removeFromSequence(frac, cursorPointer);
                 }
@@ -138,6 +138,25 @@ public final class CursorDelete {
     }
 
     /**
+     * DEL "entering" a slot at its end (e.g. Center-after-fraction stepping into a non-empty
+     * denominator, or an empty denominator stepping back into the numerator): if the last token
+     * there is a plain number with real digits, delete its last character immediately instead of
+     * merely moving the cursor there. Without this, that DEL press produced no visible change at
+     * all -- the exact same "dead keystroke" issue already fixed for operators, see
+     * specs/operator_cursor_nav.md -- requiring a second press before anything actually happened.
+     *
+     * If the last token is itself a compound (nested fraction/power/sqrt/parenthesis), this just
+     * moves the cursor in without deleting -- reaching through multiple nested levels in a single
+     * press would be a separate, more surprising behavior change, not what this fixes.
+     */
+    private static CursorPointer enterAndDelete(CursorPointer target) {
+        if (target.node instanceof NumberNode && target.node.getLength() > 0) {
+            return deleteChar(target);
+        }
+        return target;
+    }
+
+    /**
      * Removes a token from its sequence and returns the cursor position that should follow.
      * A fraction slot that becomes empty gets its EmptyNode placeholder back.
      *
@@ -154,18 +173,33 @@ public final class CursorDelete {
         seq.removeChild(node);
         if (seq.getChildCount() == 0) {
             // A slot owned by a wrapper node (fraction/power/sqrt/parenthesis) must never sit
-            // at zero children -- refill it with an EmptyNode placeholder, same as a fraction's
-            // numerator/denominator already did before this became generic (see
-            // specs/editable_slots_sequencenode.md). A "plain" sequence that isn't anyone's
-            // slot (e.g. the expression root) is allowed to genuinely end up empty.
+            // at zero children -- refill it with an empty placeholder of whichever kind that
+            // slot's owner actually uses (CursorNav.freshPlaceholder -- EmptyNode for fractions,
+            // an empty NumberNode for everything else, see specs/btn_x_power_y.md Section N). A
+            // "plain" sequence that isn't anyone's slot (e.g. the expression root) is allowed to
+            // genuinely end up empty.
             if (CursorNav.isWrapperSlot(seq)) {
-                EmptyNode empty = new EmptyNode();
-                seq.add(empty);
-                return new CursorPointer(empty, 0);
+                ExpressionNode placeholder = CursorNav.freshPlaceholder(seq);
+                seq.add(placeholder);
+                return new CursorPointer(placeholder, 0);
             }
             return new CursorPointer(seq, 0);
         } else if (idx > 0) {
-            return CursorNav.afterNode(seq.getChild(idx - 1));
+            ExpressionNode prev = seq.getChild(idx - 1);
+            if (prev instanceof OperatorNode) {
+                // The deleted node sat right after an operator (e.g. "2 + <fraction>", the
+                // fraction just removed) -- land the cursor exactly where the deleted node was
+                // (right after the operator), NOT further back past it. That's what
+                // CursorNav.afterNode(operatorNode) would do instead: it deliberately returns a
+                // single "position 0" for any OperatorNode (see specs/operator_cursor_nav.md,
+                // operators are never a resting spot of their own), but that position 0 RENDERS
+                // as just before the operator -- so calling afterNode() on the operator here
+                // put the cursor on the wrong side of it ("2| +" instead of "2 + |"). A plain
+                // sequence-position pointer at the original index renders correctly at that
+                // boundary without resting "on" the operator itself.
+                return new CursorPointer(seq, idx);
+            }
+            return CursorNav.afterNode(prev);
         } else {
             return new CursorPointer(seq.getChild(0), 0);
         }
@@ -197,34 +231,5 @@ public final class CursorDelete {
             seq.removeChild(prev);
         }
         return new CursorPointer(node, 0);
-    }
-
-    /**
-     * Replaces a fraction whose denominator is empty with its remaining tokens (unwrapping):
-     * numerator tokens for a plain a/b, or integer-part + numerator tokens for a mixed number.
-     */
-    private static CursorPointer unwrapFraction(FractionNode frac, CursorPointer fallback) {
-        if (!(frac.getParent() instanceof SequenceNode)) {
-            return fallback;
-        }
-        boolean intEmpty = !frac.isMixed() || FractionNode.isEmptySlot(frac.integerPart);
-        boolean numEmpty = FractionNode.isEmptySlot(frac.numerator);
-        if (intEmpty && numEmpty) {
-            return removeFromSequence(frac, fallback);
-        }
-        SequenceNode seq = (SequenceNode) frac.getParent();
-        int idx = seq.getChildIndex(frac);
-        seq.removeChild(frac);
-        List<ExpressionNode> tokens = new ArrayList<>();
-        if (!intEmpty) {
-            tokens.addAll(frac.integerPart.children);
-        }
-        if (!numEmpty) {
-            tokens.addAll(frac.numerator.children);
-        }
-        for (int i = 0; i < tokens.size(); i++) {
-            seq.add(idx + i, tokens.get(i));
-        }
-        return CursorNav.afterNode(tokens.get(tokens.size() - 1));
     }
 }

@@ -8,13 +8,25 @@ import com.calctastic.sample.hypercal.engine.model.PowerNode;
 
 /**
  * Visual renderer for powers and superscripts: base ^ exponent.
- * 100% FAITHFUL TO HiPER Calc android.core.C0311tf.java (PowerVisual).
+ *
+ * Layout was originally ported line-for-line from HiPER Calc android.core.C0311tf.java (a
+ * conditional comparing the exponent's own baseline against half the base's), but that formula
+ * only raises the exponent correctly when its baseline happens to be small relative to the
+ * base's -- true for ordinary text, but not for a nested PowerVisual sitting in the exponent slot
+ * (see specs/editable_slots_sequencenode.md), whose own ".m" is dominated by ITS base's ascent.
+ * In that case the old formula silently fell into the branch that just top-aligns the exponent
+ * with the base, i.e. no raise at all (found & fixed 2026-09-26, see
+ * specs/btn_x_power_y.md Section L).
+ *
+ * Replaced with a simpler, content-independent rule: raise the exponent's BASELINE (not its
+ * bottom edge -- that would depend on the exponent's own descent, which varies with what's
+ * inside it, reintroducing the same fragility) by a fixed fraction of the base's own ascent, so
+ * it always lands near the vertical middle of the base glyph regardless of how the exponent is
+ * composed. Its own height is then free to extend upward past the base's own top with no
+ * clamping, which is exactly what a nested superscript-of-superscript needs.
  *
  * Implements:
  * - Scaled exponent (0.75f scale factor)
- * - Exact layout branch from C0311tf.java lines 60-95:
- *   expBaseline = baseBaseline - (0.5f * baseBaseline)
- *   fMax = Math.max(fMax, expH + (baseH - baseBaseline))
  * - Automatic parenthesis on compound base:
  *   needsParenthesesForBase() checks if base is an operator or fraction expression
  */
@@ -61,33 +73,37 @@ public class PowerVisual extends MathVisual {
         float expH = exponentVisual != null ? exponentVisual.b.y : (-paint.ascent() + paint.descent()) * 0.75f;
         float expBaseline = exponentVisual != null ? exponentVisual.m : -paint.ascent() * 0.75f;
 
-        // Exact layout branching from HiPER Calc C0311tf.java lines 65-88:
-        // if (0.5f * baseBaseline > expBaseline) { ... }
-        float f11;
-        float f12;
-        if (0.5f * baseBaseline > expBaseline) {
-            f11 = baseBaseline - (0.5f * baseBaseline);
-            f12 = (expH - expBaseline) + (0.5f * baseBaseline);
-        } else {
-            f11 = baseBaseline - expBaseline;
-            f12 = expH;
-        }
+        // How far ABOVE the base's own baseline the exponent's baseline sits -- a fixed fraction
+        // of the base's own ascent, deliberately independent of the exponent's own composition
+        // (see the class doc for why this replaced the old baseBaseline-vs-expBaseline
+        // comparison). Tune this single constant to raise/lower every exponent uniformly.
+        float raise = 0.5f * baseBaseline;
+
+        // Lay out base and exponent relative to the base's own baseline (treated as y=0 here),
+        // then shift everything down so the topmost edge of either one lands at y=0.
+        float baseTop = -baseBaseline;
+        float baseBottom = baseH - baseBaseline;
+        float expTop = -raise - expBaseline;
+        float expBottom = expH - expBaseline - raise;
+
+        float overallTop = Math.min(baseTop, expTop);
+        float overallBottom = Math.max(baseBottom, expBottom);
+
+        float totalBaseline = -overallTop; // distance from the composed top to the base's baseline
+        float totalH = overallBottom - overallTop;
 
         float fMargin = paint.measureText(" ") * 0.15f;
         float totalW = baseColumnW + fMargin + expW;
-        float totalH = Math.max(baseH, f12 + (baseH - baseBaseline));
-        float totalBaseline = (totalH - baseH) + baseBaseline;
 
         // Position base (shifted right by parenW to leave room for the decorative "(")
-        float baseY = totalH - baseH;
+        float baseY = totalBaseline - baseBaseline;
         if (baseVisual != null) {
             baseVisual.setPosition(parenW, baseY);
         }
 
         // Position exponent raised above baseline
         float expX = baseColumnW + fMargin;
-        float expY = totalBaseline - f11 - expBaseline;
-        if (expY < 0) expY = 0;
+        float expY = totalBaseline - raise - expBaseline;
         if (exponentVisual != null) {
             exponentVisual.setPosition(expX, expY);
         }

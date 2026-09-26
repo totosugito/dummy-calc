@@ -292,3 +292,169 @@ deleted.
 - `5` → `xʸ` → `xʸ` (pressed again with the cursor in the fresh empty exponent) → `5^{^{}}`,
   confirming `xʸ` can now nest inside another `xʸ`'s exponent (the SequenceNode conversion in
   `specs/editable_slots_sequencenode.md` working as intended at the model level).
+
+## L. Bug found & fixed (2026-09-26): nested exponent not visually raised/shrunk, plus a leftover-placeholder bug it exposed
+
+Verifying that Section K's fix actually let a power nest inside another power's exponent (model
+level: `5^{^{}}`, correct) surfaced two more bugs, both specific to what happens once nesting is
+actually possible — neither existed as reachable bugs before Section K, since you couldn't get a
+`PowerNode` into another `PowerNode`'s exponent slot at all until then.
+
+**L.1: `PowerVisual`'s superscript-raise formula broke for a nested exponent.** `5 → xʸ → xʸ`
+rendered as two same-size boxes sitting at the SAME baseline as `5` — not a properly raised, shrunk
+superscript-of-superscript. Root cause: the layout math (ported from `C0311tf.java`) decided how
+far to raise the exponent by comparing the exponent's own baseline (`.m`) against half the base's:
+```
+if (0.5f * baseBaseline > expBaseline) { f11 = baseBaseline - 0.5f*baseBaseline; ... }
+else                                    { f11 = baseBaseline - expBaseline; ... }  // ~= 0 raise
+```
+This only raises correctly when the exponent's own baseline happens to be small relative to the
+base's — true for a plain digit, but false for a nested `PowerVisual`, whose own `.m` is dominated
+by *its* base's ascent (not shrunk enough to trip the first branch), so it fell into the branch
+that produces essentially zero raise.
+
+**Fix:** replaced the comparison-based formula with a **content-independent rule**: always raise
+the exponent's baseline by a fixed fraction of the base's own ascent (`raise = 0.5f * baseBaseline`
+— tune this one constant to raise/lower every exponent uniformly), regardless of what the exponent
+is made of. The exponent's own height is then free to extend above the base's own top with no
+clamping (this is also what makes a deeply nested exponent's top rise progressively higher, which
+looks correct rather than getting cut off). Anchoring by baseline rather than by the exponent's
+bottom edge was a deliberate choice — the bottom edge depends on the exponent's own descent, which
+varies with its content and would reintroduce the exact fragility being fixed. See the updated
+class doc on `render/PowerVisual.java` for the full before/after.
+
+**L.2: a second, invisible bug the fix above exposed while testing it.** Pressing `xʸ` a second
+time with the cursor in a fresh, still-empty exponent (created by a first `xʸ`) inserted the new
+nested `PowerNode` as a **sibling** of the old empty placeholder instead of replacing it — invisible
+in the debug LaTeX (an empty `NumberNode`'s `toLatexString()` is `""`, so `5^{^{}}` still *looked*
+correct), but a real extra empty box rendered next to the nested power (this is what made L.1 look
+even more broken than it was — three boxes on screen instead of two).
+
+Root cause: `CursorNav.insertAtCursor()` only special-cased replacing an `EmptyNode` (`QA`, used by
+fraction slots) under the cursor — not an *empty* `NumberNode`, which is the placeholder convention
+used by `xʸ`/`x²`/`x³`/`x⁻¹`/`√`/`(` (see `btn_1_per_x.md`'s note on this same convention). So
+inserting the new `PowerNode` at the cursor's position landed it right next to the old empty leaf
+instead of consuming it.
+
+**Fix:** generalized `insertAtCursor`'s replacement check to a new `isEmptyPlaceholder(node)`
+helper — true for `EmptyNode` OR a `NumberNode` with no text — so both placeholder conventions are
+treated the same everywhere `insertAtCursor` is used (not just for power-in-power nesting).
+
+**Verified on emulator:**
+- `5 → xʸ → xʸ → 3` → `5^{3^{}}`, screenshot confirms exactly two boxes (nested base showing `3`,
+  nested exponent still empty, correctly small and raised above the `3`) — no leftover third box.
+- `3 → x²` (plain non-nested case) still renders with normal-looking superscript placement —
+  the raise-formula rewrite didn't change the common case's appearance.
+
+**UPDATE 2026-09-26, see `btn_fraction.md` Section J — this is no longer considered a bug:**
+`5 → x² → DEL` deletes the ENTIRE `5^{2}` in one press, because `CursorDelete.deleteChar()` has no
+dedicated case for `PowerNode` at all — any cursor sitting directly on one falls through to the
+generic `removeFromSequence`, which removes the whole node regardless of content. This was
+originally flagged here as a pre-existing bug (fraction had an explicit "Center-after → unwrap"
+case that power lacked). It was later pointed out that this asymmetry should be resolved the other
+way: fraction's DEL was changed to match power's existing one-shot delete, rather than power being
+given fraction's old unwrap behavior — see `btn_fraction.md` Section J for the full reasoning
+(deleting a compound outright when the cursor is right after it, with fine-grained editing requiring
+the cursor to be positioned explicitly inside first). So `5 → x² → DEL` deleting everything is now
+the deliberate, intended behavior, consistent with fraction — not a gap.
+
+Still true and still unfixed: `CursorDelete` has no position-aware handling for `PowerNode` at all,
+meaning DEL at Center-BEFORE a power (position 0, cursor to its left) *also* deletes the whole power
+instead of whatever token actually precedes it — inconsistent with fraction, which correctly
+distinguishes position 0 (delete the preceding token) from position 1 (delete the whole fraction).
+See `btn_fraction.md` Section L for this flagged-but-not-yet-fixed inconsistency (applies to
+`SqrtNode`/`ParenthesisNode` too).
+
+## M. Fix (2026-09-26): empty exponent/base box too large compared to an actual digit
+
+User feedback comparing `5^{2}` against `5` → `xʸ` (empty exponent) side by side: the empty
+placeholder box was noticeably bigger than an actual digit occupying the same slot — it should look
+"standard", i.e. about the size of the digit that would eventually go there.
+
+This box is drawn by `NumberVisual`'s empty-text branch (shared by the base/exponent of
+`xʸ`/`x²`/`x³`/`x⁻¹`, the radicand/degree of `√`, and the content of `(...)` — anywhere an empty
+`NumberNode` placeholder is used, per the convention noted in `btn_1_per_x.md`). Its size came from
+two sources, both oversized relative to an actual digit at the same scale `D`:
+
+1. **Width** was `paint.measureText("0") * 1.2f` — a deliberate 20% padding, ported from the
+   fraction placeholder's box formula (`C0357yG`, see `btn_fraction.md` Section 3), which is
+   faithful for a top-level `a/b` slot but was never meant for a shrunk-down superscript context.
+2. **Height** was the full font line-height (`-ascent + descent`, i.e. the same `b.y` a real
+   `NumberVisual` reports for its own baseline-alignment bookkeeping), **plus** an extra
+   `0.9f * density * D` padding term added earlier (see Section E) specifically to stop the box
+   from looking oversized once scaled down for an exponent. A digit like `2` has no descender, so
+   its actual ink never reaches the descent line, but the box was still drawn using the full
+   ascent+descent height — visibly taller than the digit's own footprint, and the extra padding
+   term made this worse rather than better.
+
+**Fix:** the empty box is now sized to match a plain digit's own visual footprint at scale `D`:
+- Width: `paint.measureText("0")` (no padding factor).
+- Height: `-paint.ascent()` only, with the box's bottom edge landing exactly on the baseline
+  (`b.y = m`) — matching where a digit without a descender actually sits, instead of extending into
+  unused descender space below it.
+
+The old `0.9f * density * D` term (Section E's fix for the box being disproportionately large in a
+scaled-down exponent) is no longer needed and was removed along with it — this rewrite addresses
+the same complaint at its root (the box's base dimensions were wrong to begin with) rather than
+patching the symptom with an extra scaled-down padding term.
+
+**Verified on emulator:** `5^{2} + 5^{xʸ}` (built side by side to compare directly) — the empty
+exponent box is now close in width and height to the `2` digit box next to it, instead of visibly
+larger. Re-checked the nested-power case from Section L (`5 → xʸ → xʸ → 3` → `5^{3^{}}`) and
+`√(...)`'s empty content box (via `√` then `(`, which nests correctly per L.2's fix) — both still
+render correctly with the smaller box size.
+
+## N. Bug found & fixed (2026-09-26): box size changes after typing then deleting a digit
+
+User feedback right after Section M: `5 → xʸ` (fresh empty exponent, small box per Section M),
+type `5` into it, then DEL back to empty again — the box that reappears is visibly **bigger** than
+the one the button first created, even though both represent the exact same thing (an empty
+exponent).
+
+**Root cause:** two different code paths create an "empty placeholder" for the same slot, and only
+one of them got updated by Section M. `PowerInserter` (and `insertSqrt`/`insertParenthesis`) create
+a fresh empty slot with `new NumberNode("")`, rendered by `NumberVisual`'s empty-box branch (the one
+Section M just resized). But `CursorDelete.removeFromSequence()`'s generic "an emptied-out slot
+must be refilled, don't leave it with zero children" logic — added for the SequenceNode conversion,
+see `specs/editable_slots_sequencenode.md` — always refills with `new EmptyNode()`, rendered by
+`PlaceholderVisual` instead. `EmptyNode`/`PlaceholderVisual` is the right placeholder for a
+**fraction** slot (that's its native, faithful convention, see `btn_fraction.md` Section 3), but
+power/sqrt/parenthesis slots have never used `EmptyNode` anywhere else — they use an empty
+`NumberNode` everywhere, including in their own DEL-to-empty case for a fraction's numerator/
+denominator. So DEL on power/sqrt/paren content silently swapped the placeholder to the *wrong*
+kind, which (especially post-Section M, now that the two boxes are sized differently on purpose)
+made the box visibly change size for no reason the user did anything to cause.
+
+**Fix:** `CursorNav.isWrapperSlot(SequenceNode)` split into a private `isWrapperSlot(ExpressionNode
+owner)` plus a new `CursorNav.freshPlaceholder(SequenceNode seq)`, which returns the *matching*
+placeholder for that slot's owner: `EmptyNode` for a `FractionNode` slot, an empty `NumberNode` for
+everything else (power/sqrt/parenthesis). `CursorDelete.removeFromSequence()` now calls
+`freshPlaceholder` instead of hardcoding `new EmptyNode()`.
+
+**Verified on emulator:** `5 → xʸ` (box A, screenshot) vs. `5 → xʸ → 5 → DEL` (box B, screenshot) —
+pixel-identical now. `a/b → 5 → DEL` (fraction numerator emptied back out) still correctly shows
+`\square` (`EmptyNode`), confirming fraction slots are unaffected by this fix.
+
+**Audited for the same mistake elsewhere (2026-09-26):** since `CursorDelete` had this exact
+bug — creating the wrong placeholder type for a non-fraction slot — the natural next question was
+whether the same mistake was made anywhere else a slot gets an empty placeholder. Grepped every
+`new EmptyNode()` / `new NumberNode("")` call site in `engine/`:
+
+- `PowerNode.toSlot()`, `SqrtNode.toSlot()`, `ParenthesisNode.toSlot()` (private helpers, one per
+  class, added by the SequenceNode conversion in `specs/editable_slots_sequencenode.md`) all had
+  the identical bug in their own fallback branches (`node == null`, or given an already-empty
+  `SequenceNode`) — they used `new EmptyNode()` instead of `new NumberNode("")`, copy-pasted from
+  `FractionNode.toSlot()` (where `EmptyNode` is correct) without updating the placeholder type for
+  these classes' different convention. **Currently unreached dead code** in practice — every
+  current call site (`PowerInserter`, `ExpressionEditor.insertSqrt`/`insertParenthesis`) always
+  passes a real, possibly-empty `NumberNode`, never `null` or an empty `SequenceNode` — but it was
+  a bug waiting to trigger the exact same visible symptom as this section's main bug the moment
+  something did hit it (e.g. a future feature passing a `SequenceNode` straight into one of these
+  constructors). Fixed in all three to use `new NumberNode("")`, matching `CursorNav.freshPlaceholder`.
+- `FractionNode.toSlot()` itself: correct as-is (`EmptyNode` is its right convention).
+- `CursorNav.isEmptyPlaceholder()` (Section L.2) and `CursorNav.freshPlaceholder()` (this section):
+  both already treat the two conventions correctly, so nothing to fix there.
+
+**Re-verified on emulator after this audit:** fresh `√{}`, `x³` (`^{3}`), `x⁻¹` (`^{-1}`), `1/x`
+(`\frac{1}{}`), and `(` (`()`) all still produce plain empty `NumberNode` boxes as expected — no
+`\square` leaking into any non-fraction slot.
