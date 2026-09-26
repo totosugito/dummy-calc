@@ -203,7 +203,11 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
 - [x] **Task 13: Geometri placeholder persis `C0357yG`**
   - `PlaceholderVisual`: `m = -ascent + 0.9 × density`, `b.y = descent + m`. Kotak digambar dari `y=0` sampai `y=b.y` (versi kita tidak mengimplementasikan padding vertikal `L` milik `AbstractC0335wD`, jadi `fB` disederhanakan jadi 0 — ini simplifikasi yang disengaja, bukan berdasarkan kode).
   - Rumus lama (`textSize × 0.9`, kotak berpusat di `m ± ascent×0.9`) sudah tidak dipakai.
-- [ ] **Task 14: Mode placeholder tersembunyi `C0357yG.E()` / `QA.B()` / `QA.D()`**: tidak digambar, lebar ±cursorWidth, kursor di (0,0). Plus mode elipsis `"…"` (`qa.b()`) dan label argumen `L()`.
+- [ ] **Task 14: Mode placeholder tersembunyi `C0357yG.E()` / `QA.B()` / `QA.D()`** — **TIDAK DIKERJAKAN, bergantung subsistem yang tidak ada di sample ini**.
+  - `C0357yG.E()` (dibaca ulang 2026-09-26): hanya mengecek `qa.D()`/`qa.B()` ketika `AbstractC0033Df.k.mo40HiPER() == EnumC0051Ha.HiPER` — semacam mode aplikasi global (kemungkinan "mode isi argumen fungsi/template", bukan mode kalkulasi biasa). Di luar mode itu, `E()` selalu `true` (kotak tidak pernah disembunyikan).
+  - `QA.B()`/`QA.D()` sendiri isinya pengecekan grammar yang rumit: apakah slot ini argumen terakhir dari fungsi variadic (`GA`/`C0067Lb` dengan `enumC0300sa.xa`), apakah aman dihapus tanpa mengubah makna, dll — semua bergantung pada struktur AST fungsi (`GA`, kode error `EnumC0300sa`) yang tidak ada padanannya sama sekali di `engine/model` sample ini (`FractionNode`, `SqrtNode`, dst. jauh lebih sederhana, tidak ada konsep "fungsi dengan argumen variadic/opsional").
+  - Mengimplementasikan ini secara jujur berarti membangun ulang subsistem mode + grammar function-argument yang tidak dibutuhkan sample kalkulator ini. Bukan prioritas sampai ada fitur fungsi/argumen yang butuh perilaku ini.
+  - Elipsis `"…"` (`qa.b()` / `HiPER()` method) juga bagian dari subsistem yang sama (dipakai saat argumen fungsi disembunyikan sebagai ringkasan) — ikut ditunda.
 - [x] **Task 15: Warna garis & kotak memakai warna tema, bukan hardcode**
   - **Temuan:** `AbstractC0335wD.HiPER(Paint, String)` (dipakai `C0357yG` untuk kotak placeholder) mengembalikan paint **apa adanya** kalau key highlight yang dicari tidak ada di map tema — yaitu kondisi normal (tidak sedang di-highlight). Jadi kotak placeholder dan garis pecahan **memakai warna teks biasa**, bukan warna sekunder/transparan terpisah seperti asumsi lama (`#80FFFFFF`).
   - `PlaceholderVisual`: kotak sekarang mewarisi warna dari `basePaint` (sama seperti teks), tidak ada `setColor` terpisah.
@@ -216,7 +220,9 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
   - `MathVisual.getCursorPosition` default: index 0 → `-0.5w`, selain itu → `b.x + 0.5w`. Dipakai oleh `FractionVisual` (Center sebelum/sesudah) dan `PlaceholderVisual` (kotak kosong).
   - **Temuan:** `C0357yG` (placeholder) tidak override `mo359HiPER`, jadi kursor di kotak kosong sebenarnya nongkrong di kiri kotak (`-w..0`), bukan di tengah seperti sebelumnya. Sudah dicek visual di emulator (`a/b` pada display kosong) — kursor persis di tepi kiri kotak pembilang.
   - `NumberVisual` posisi kursor antar-digit tetap dipertahankan seperti semula (bukan hasil decompile pasti — lihat catatan di bawah).
-- [ ] **Task 18: Verifikasi hit-test `Qg.HiPER(PointF,bool,bool)` via smali** — JADX gagal decompile; fragmen menunjukkan perbandingan ke titik tengah, bukan batas min/max anak.
+- [ ] **Task 18: Verifikasi hit-test `Qg.HiPER(PointF,bool,bool)` via smali** — **TIDAK BISA DIKERJAKAN, diblokir tooling**.
+  - JADX gagal decompile method ini ke Java; fragmen yang tersisa menunjukkan perbandingan ke titik tengah, bukan batas min/max anak seperti asumsi implementasi kita.
+  - Untuk memastikan perlu baca bytecode smali langsung, tapi tidak ada file `.smali` maupun tool `apktool`/`baksmali` di lingkungan ini (hanya source hasil JADX di `temp/`). Perlu di-generate ulang dari APK asli (`raw/` atau `.apk`) di luar sesi ini kalau mau dituntaskan.
 - [x] **Task 20: a/b tepat setelah pecahan — DIBALIK ke nesting (2026-09-26), lihat Task 20b**
   - Riwayat: pertama kali "sibling" (`hasOperandBeforeCursor` mengecualikan `FractionNode`) untuk memperbaiki komplain awal ("kursor keluar pecahan, a/b malah mengisi penyebut otomatis").
   - Efek samping sibling: dua pecahan bersebelahan berdempetan tanpa spasi (kode asli `C0329vH.mo63HiPER()` baris ~176: advance horizontal = `x += lebar elemen` saja, tidak ada mekanisme gap antar elemen sequence — `mo358HiPER()` yang tampak seperti margin ternyata dipakai untuk keputusan word-wrap, bukan spacing visual, dan `Qg`/Fraction tidak override itu).
@@ -235,4 +241,10 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
 2. ~~**Skala display:** `display_scaling_typography.md` Task 7.~~ ✅ selesai 2026-09-26
 3. ~~**Akurasi render:** Task 13 → Task 17 → Task 11 → Task 16 (+ display Task 9).~~ ✅ selesai 2026-09-26
 4. ~~**Warna tema:** Task 15 (+ display Task 8).~~ ✅ selesai 2026-09-26
-5. **Fitur tambahan:** Task 10 → Task 14 (+ display Task 10).
+5. **Fitur tambahan:** Task 10 (dinonaktifkan/ditunda atas permintaan user), Task 14 (ditunda — bergantung subsistem yang tidak ada), Task 18 (diblokir tooling). Display Task 10 (scroll+clip) ✅ selesai 2026-09-26, Display Task 12 (diblokir tooling).
+
+### D. Sisa Pekerjaan
+Semua task yang bisa dikerjakan di lingkungan ini sudah selesai. Yang tersisa:
+- **Task 10 (linear mode):** dinonaktifkan/ditunda atas permintaan user — jangan kerjakan tanpa instruksi eksplisit.
+- **Task 14 (placeholder tersembunyi):** ditunda — butuh subsistem mode + grammar fungsi/argumen yang tidak ada di sample ini.
+- **Task 18 (verifikasi hit-test via smali) & Display Task 12 (string `HcZgWQ.LiVE`):** diblokir kurangnya tooling smali (`apktool`/`baksmali`) di lingkungan ini, bukan soal effort.

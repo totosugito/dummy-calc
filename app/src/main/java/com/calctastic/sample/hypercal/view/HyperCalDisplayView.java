@@ -274,6 +274,7 @@ public class HyperCalDisplayView extends View {
 
         // Calculate layout
         currentRootVisual.calculateLayout(textPaint);
+        currentRootVisual.setPosition(0.0f, 0.0f);
 
         // Position on Canvas (HiPER padding & baseline calculation)
         float paddingLeft = 32f;
@@ -281,12 +282,31 @@ public class HyperCalDisplayView extends View {
         float viewWidth = getWidth();
         float viewHeight = getHeight();
 
-        float startX = paddingLeft;
-        if (currentRootVisual.b.x + paddingLeft + paddingRight < viewWidth) {
-            startX = paddingLeft;
-        } else {
-            // Scroll to end if expression overflows display width
-            startX = viewWidth - paddingRight - currentRootVisual.b.x;
+        // Horizontal scroll, faithful in spirit to UF.java's clip+offset (lines 436-440, 638):
+        // the original clips to the display width and offsets by a scroll amount B so long
+        // expressions stay on-screen. Full multi-line wrapping (C0329vH's line-break algorithm)
+        // is not ported here (out of scope for this sample); instead the expression scrolls
+        // horizontally, keeping the cursor visible, and is clipped to the view bounds below.
+        float minStartX = Math.min(paddingLeft, viewWidth - paddingRight - currentRootVisual.b.x);
+        float maxStartX = paddingLeft;
+        float startX = Math.max(minStartX, Math.min(lastStartX, maxStartX));
+
+        MathVisual targetVisual = (cursorPointer != null && cursorPointer.node != null)
+                ? findVisualForNode(currentRootVisual, cursorPointer.node) : null;
+        if (targetVisual != null) {
+            float localCursorX = 0.0f;
+            for (MathVisual curr = targetVisual; curr != null; curr = curr.parent) {
+                localCursorX += curr.HiPER.x;
+            }
+            if (localCursorX + startX < paddingLeft) {
+                startX = paddingLeft - localCursorX;
+            } else if (localCursorX + startX > viewWidth - paddingRight) {
+                startX = (viewWidth - paddingRight) - localCursorX;
+            }
+            startX = Math.max(minStartX, Math.min(startX, maxStartX));
+        } else if (lastStartX == 0.0f) {
+            // First layout with no cursor found yet: default to showing the start.
+            startX = maxStartX;
         }
 
         // Baseline placement faithful to UF.java lines 452-474:
@@ -305,8 +325,10 @@ public class HyperCalDisplayView extends View {
 
         currentRootVisual.setPosition(startX, startY);
 
-        // Draw visual expression
+        // Draw visual expression, clipped to the view so an expression wider/taller than the
+        // display doesn't bleed into the keypad below it (UF.java line 638: canvas.clipRect).
         canvas.save();
+        canvas.clipRect(0, 0, viewWidth, viewHeight);
         canvas.translate(startX, startY);
         currentRootVisual.draw(canvas, textPaint);
         canvas.restore();
@@ -314,15 +336,15 @@ public class HyperCalDisplayView extends View {
         // Draw cursor caret if visible matching AbstractC0335wD.mo360HiPER() & UF.k(Canvas)
         if (cursorVisible && cursorPointer != null && cursorPointer.node != null) {
             RectF cursorRect = null;
-            MathVisual targetVisual = findVisualForNode(currentRootVisual, cursorPointer.node);
+            MathVisual cursorVisualNode = findVisualForNode(currentRootVisual, cursorPointer.node);
 
-            if (targetVisual != null) {
+            if (cursorVisualNode != null) {
                 // Exact calculation matching AbstractC0335wD.mo360HiPER()
-                RectF localRect = targetVisual.getCursorRect(cursorPointer.position, textPaint);
+                RectF localRect = cursorVisualNode.getCursorRect(cursorPointer.position, textPaint);
                 if (localRect != null) {
                     cursorRect = new RectF(localRect);
                     // Accumulate parent offsets up to root (Faithful to UF.m248L lines 367-382)
-                    MathVisual curr = targetVisual;
+                    MathVisual curr = cursorVisualNode;
                     while (curr != null) {
                         cursorRect.offset(curr.HiPER.x, curr.HiPER.y);
                         curr = curr.parent;
