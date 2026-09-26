@@ -159,13 +159,62 @@ Berdasarkan `C0067Lb.java` & `ZB.java`:
   - `VisualTreeBuilder` memetakan `EmptyNode -> PlaceholderVisual`.
 - [x] **Task 3: Hit-Testing Horizontal Presisi (`FractionVisual.hitTest`)**
   - Cek span horizontal: jika tap di luar $[ \text{numX}, \text{numX} + \text{numW} ]$ dan $[ \text{denX}, \text{denX} + \text{denW} ]$, kembalikan kursor ke posisi Center di parent `SequenceNode`.
-- [ ] **Task 4: Keypad & Navigasi Kursor (`HyperCalActivity.java`)**
+- [x] **Task 4: Keypad & Navigasi Kursor (`HyperCalActivity.java`)** — lihat Task 6–8 untuk perbaikan lanjutan
   - `insertFraction()`: buat `FractionNode(new EmptyNode(), new EmptyNode())` dan arahkan kursor ke `numerator` (`EmptyNode`).
   - `appendDigit(char c)`: jika kursor berada pada `EmptyNode`, ganti `EmptyNode` dengan `NumberNode(c)`.
   - `deleteChar()`: jika di penyebut berisi angka sampai habis, kembalikan ke `EmptyNode`. Jika DEL lagi di `EmptyNode` penyebut, pindahkan kursor ke akhir pembilang. Jika pembilang dan penyebut keduanya `EmptyNode`, hapus pecahan dari Sequence.
   - `moveCursorLeft()` & `moveCursorRight()`: dukung transisi kursor ke posisi Center di Sequence parent sebelum/setelah pecahan.
-- [ ] **Task 5: Verifikasi di Emulator**
+- [x] **Task 5: Verifikasi di Emulator** — tap kiri/kanan terverifikasi 2026-09-26 (`5 + [tap kiri]8 123/7 [tap kanan]9 + 3`)
   - Tekan tombol `a/b` saat display kosong $\rightarrow$ harus muncul 2 kotak outline (pembilang & penyebut) dengan kursor di kotak pembilang.
   - Ketik `7` $\rightarrow$ kotak pembilang menjadi angka 7.
   - Tekan `a/b` atau panah kanan $\rightarrow$ kursor pindah ke kotak penyebut.
   - Ketuk di sebelah kanan / kiri pecahan $\rightarrow$ kursor pindah ke posisi Center sejajar garis pecahan.
+
+---
+
+## 11. Gap Analysis vs Kode Asli (2026-09-26) & Task List Lanjutan
+
+Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.java` dengan implementasi kita.
+
+### A. Struktur & Logika Input (dikerjakan)
+- [x] **Task 6: Slot pembilang/penyebut = `SequenceNode` (GA di dalam `C0067Lb`)**
+  - `FractionNode.numerator/denominator` kini `SequenceNode`; slot kosong berisi satu `EmptyNode`.
+  - Operator/angka bisa diketik di dalam slot (`1+2` di pembilang). Sebelumnya `appendOperator` jatuh ke `rootSequence`.
+  - Helper baru di `HyperCalActivity`: `insertAtCursor`, `fractionOfSlot`, `startOf`/`endOf`/`afterNode`, `removeFromSequence`, `deleteBefore`.
+  - Navigasi kiri/kanan kini berbasis batas slot (awal/akhir sequence), bukan identitas node tunggal.
+- [x] **Task 7: `insertFraction()` setelah operator = Kasus 2**
+  - Hanya operand tepat sebelum kursor (Number/Power/Sqrt/Paren/Fraction dengan posisi > 0) yang diangkat ke pembilang.
+  - Setelah operator / di placeholder / display kosong → dua kotak kosong, kursor di pembilang.
+- [x] **Task 8: DEL di pembilang kosong saat penyebut terisi**
+  - Kotak pembilang tetap tampil, kursor pindah ke Center sebelum pecahan (sebelumnya token terakhir `rootSequence` ikut terhapus).
+  - Angka yang habis dihapus di slot langsung kembali ke `EmptyNode`.
+  - DEL di Center sebelum pecahan menghapus satu karakter/token sebelumnya (bukan seluruh angka).
+- [x] **Task 9: Verifikasi emulator** — `a/b 1 + 2 → 3` → `\frac{1 + 2}{3}`; `5 + a/b 7` → `5 + \frac{7}{□}`; DEL di pembilang kosong → `7 + \frac{□}{3}` tetap; `a/b DEL` → display kosong.
+
+### B. Belum Dikerjakan
+- [ ] **Task 10: Mode linear `a/b`** (`Qg.a`, `Qg.java` baris 96–126): render sebaris dengan `'/'`, anak tidak diskala 0.8, baseline `max(numM, -ascent, denM)`.
+- [ ] **Task 11: Padding nested fraction `m$3()`**: lebar `+= 2 × m$3()` bila anak berupa pecahan; garis dari `fMin - m$3()` sampai `F()`.
+- [x] **Task 12: Navigasi atas/bawah** (`Qg.HiPER(PointF, Df)` / `Qg.E(PointF, Df)`): pindah pembilang ↔ penyebut, x di-clamp dengan margin `ZD.ab (0.2) × density`. Perlu tombol ▲/▼.
+  - Selesai: baris tombol baru `btn_cursor_up` / `btn_cursor_down` (di atas ◀ / ▶) di `activity_hypercal.xml`; `HyperCalDisplayView.findVerticalCursorTarget()` mencari pecahan terdekat lalu hit-test slot seberang dengan x kursor. Uji: `a/b 123 ▼ 7 ▲ 5` → `\frac{1253}{7}` (5 masuk di posisi x yang sama).
+- [ ] **Task 13: Geometri placeholder persis `C0357yG`**: `m = -ascent + 0.9 × density`, `b.y = m + descent`, kotak dari `fB = (b() - E())/2` sampai `E() + fB`. (Rumus `textSize × 0.9` di Bagian 3 tidak sesuai kode.)
+- [ ] **Task 14: Mode placeholder tersembunyi `C0357yG.E()` / `QA.B()` / `QA.D()`**: tidak digambar, lebar ±cursorWidth, kursor di (0,0). Plus mode elipsis `"…"` (`qa.b()`) dan label argumen `L()`.
+- [ ] **Task 15: Warna garis & kotak** memakai warna tema `HiPER(paint, strHiPER)`, bukan `#80FFFFFF` hardcode.
+- [ ] **Task 16: Hapus clamp `Math.max(1.5f, …)`** pada gap, tebal garis, dan stroke placeholder (tidak ada di kode asli).
+- [ ] **Task 17: Geometri kursor `mo359/mo360`**: tinggi = tinggi penuh visual (`0..b.y`), x index 0 = `-0.5w`, index 1 = `b.x + 0.5w`; kursor placeholder tidak di tengah kotak.
+- [ ] **Task 18: Verifikasi hit-test `Qg.HiPER(PointF,bool,bool)` via smali** — JADX gagal decompile; fragmen menunjukkan perbandingan ke titik tengah, bukan batas min/max anak.
+- [x] **Task 20: a/b tepat setelah pecahan membungkus pecahan itu sendiri (bug dari Task 7)**
+  - Repro: `a/b 1 ▶ 2 ▶ a/b` → `\frac{\frac{1}{2}}{□}`, kursor langsung di penyebut.
+  - Penyebab: `hasOperandBeforeCursor()` menganggap `FractionNode` (posisi 1) sebagai operand.
+  - Perbaikan: pecahan bukan operand → a/b membuat pecahan kosong baru di sebelahnya (`1/2 □/□`), kursor di pembilang baru.
+  - Selesai: uji `a/b 1 ▶ 2 ▶ a/b 7` → `\frac{1}{2}\frac{7}{□}`.
+  - Catatan: referensi `C0196hc.java` baris 347–363 ternyata transformasi ekspresi (evaluasi), bukan aksi tombol; perilaku asli HiPER untuk kasus ini belum terbukti.
+- [x] **Task 19: Unwrapping pecahan** saat DEL di Center setelah pecahan.
+  - Penyebut kosong → pecahan diganti isi pembilang, kursor di akhir isi tsb (pembilang juga kosong → pecahan dihapus). Penyebut terisi → kursor masuk ke akhir penyebut (seperti sebelumnya).
+  - Uji: `5 a/b ▶ DEL 3` → `53`; `2 + a/b 1 ▶ ▶ DEL` → `2 + 1`.
+
+### C. Urutan Prioritas Pengerjaan
+1. ~~**Perilaku (langsung terasa pengguna):** Task 20 → Task 19 → Task 12 → verifikasi tap kiri/kanan pecahan (sisa Task 5).~~ ✅ selesai 2026-09-26
+2. **Skala display:** `display_scaling_typography.md` Task 7.
+3. **Akurasi render:** Task 13 → Task 17 → Task 11 → Task 16 (+ display Task 9).
+4. **Warna tema:** Task 15 (+ display Task 8).
+5. **Fitur tambahan:** Task 10 → Task 14 (+ display Task 10).

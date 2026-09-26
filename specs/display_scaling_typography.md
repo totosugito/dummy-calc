@@ -88,9 +88,25 @@ $$\text{screenScale} = \text{mo352HiPER}() = \mathbf{Tg.HiPER(V.HiPER)}$$
 - [x] **Task 2: Konfigurasi Typeface Asli HiPER (`HyperCalDisplayView.java`)**
   - Gunakan `Typeface.create("Arial", Typeface.NORMAL)` dengan fallback `Typeface.SANS_SERIF` sesuai `AbstractC0293re.java`.
 - [x] **Task 3: Baseline & Padding Alignment (`UF.java` line 457)**
+  - *(2026-09-26: sebelumnya tercentang tapi `onDraw` masih memusatkan vertikal; kini benar-benar diterapkan, lihat Task 6.)*
   - Terapkan padding dan baseline offset asli:
     $$f_3 = (-\text{paint.ascent()}) \times 1.6\text{f}$$
 - [x] **Task 4: Update Proporsi Caret Kursor**
   - Tebal kursor dan tinggi kursor otomatis mengikuti ukuran `basePaint` baru yang proporsional ($54.8\text{px}$).
 - [x] **Task 5: Verifikasi Visual & Emulator**
   - Berhasil dikompilasi, diinstal, dan diverifikasi di emulator Android Pixel. Text tampil jauh lebih besar, jelas, dan proporsional persis HiPER Calc.
+
+---
+
+## 6. Gap Analysis vs Kode Asli (2026-09-26) & Task List Lanjutan
+
+- [x] **Task 6: Baseline display persis `UF.java` baris 452–474**
+  - `f3 = (-ascent) × 1.6`; `baseline = max(f3, root.m)`.
+  - Jika bagian di bawah baseline (`root.b.y - root.m`) > `viewHeight - f3` → `baseline = max(root.m, viewHeight - below)`.
+  - `startY = baseline - root.m` (menggantikan `(viewHeight - b.y) / 2`). Terverifikasi di emulator: ekspresi menempel di atas display.
+- [ ] **Task 7: Rumus skala `k() = Tg.HiPER(V) × D × G.HiPER`**, ukuran font `k() × 14` per visual. Sekarang `width / 276f` tanpa density; `REFERENCE_WIDTH_DP = 310` tidak terpakai; rasio `f_y` (landscape) belum ada. Samakan angka tabel (~89px) dengan Task 4 (54.8px).
+- [ ] **Task 8: Paint per visual via `k$1()`**: typeface + style dari `C0215jD`, warna dari tema key `"86"`. Hilangkan hardcode `0xFFFFFFFF` (teks) & `0xFF2196F3` (kursor).
+- [ ] **Task 9: Hapus clamp lebar kursor** `Math.max(3.0f, …)` / `Math.max(2.0f, …)`.
+- [ ] **Task 10: Scroll, clip & wrap multi-baris** (`UF.java` baris 436–440, 638): `canvas.clipRect` dengan offset `B`, batas lebar `G.m` untuk wrap.
+- [ ] **Task 11: Bersihkan Javadoc usang** di `HyperCalDisplayView` (masih menyebut `22sp`, `R.font.math_symbols`).
+- [ ] **Task 12: Pastikan string ukur `HcZgWQ.LiVE`** pada `AbstractC0335wD.HiPER(paint, f)` memang `" "` (diisi saat runtime).

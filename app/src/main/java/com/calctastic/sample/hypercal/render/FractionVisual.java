@@ -167,12 +167,12 @@ public class FractionVisual extends MathVisual {
             PointF localPoint = new PointF(point.x - numeratorVisual.HiPER.x, point.y - numeratorVisual.HiPER.y);
             com.calctastic.sample.hypercal.engine.model.CursorPointer hit = numeratorVisual.hitTest(localPoint, basePaint);
             if (hit != null) return hit;
-            return new com.calctastic.sample.hypercal.engine.model.CursorPointer(fractionNode.numerator, 0);
+            return new com.calctastic.sample.hypercal.engine.model.CursorPointer(fractionNode.numerator.getChild(0), 0);
         } else if (denominatorVisual != null) {
             PointF localPoint = new PointF(point.x - denominatorVisual.HiPER.x, point.y - denominatorVisual.HiPER.y);
             com.calctastic.sample.hypercal.engine.model.CursorPointer hit = denominatorVisual.hitTest(localPoint, basePaint);
             if (hit != null) return hit;
-            return new com.calctastic.sample.hypercal.engine.model.CursorPointer(fractionNode.denominator, 0);
+            return new com.calctastic.sample.hypercal.engine.model.CursorPointer(fractionNode.denominator.getChild(0), 0);
         }
         return new com.calctastic.sample.hypercal.engine.model.CursorPointer(fractionNode, 0);
     }

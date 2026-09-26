@@ -244,8 +244,16 @@ public class HyperCalDisplayView extends View {
             startX = viewWidth - paddingRight - currentRootVisual.b.x;
         }
 
-        float startY = (viewHeight - currentRootVisual.b.y) / 2f;
-        if (startY < 8f) startY = 8f;
+        // Baseline placement faithful to UF.java lines 452-474:
+        // f3 = (-paint.ascent()) * 1.6f; baseline = max(f3, root.m),
+        // pulled up when the part below the baseline would overflow the display height.
+        float f3 = (-textPaint.ascent()) * 1.6f;
+        float baselineY = Math.max(f3, currentRootVisual.m);
+        float belowBaseline = currentRootVisual.b.y - currentRootVisual.m;
+        if (belowBaseline > viewHeight - f3) {
+            baselineY = Math.max(currentRootVisual.m, viewHeight - belowBaseline);
+        }
+        float startY = baselineY - currentRootVisual.m;
 
         lastStartX = startX;
         lastStartY = startY;
@@ -287,6 +295,48 @@ public class HyperCalDisplayView extends View {
                 canvas.drawRect(cursorRect, cursorPaint);
             }
         }
+    }
+
+    /**
+     * Cursor target for ▲ / ▼, faithful to Qg.HiPER(PointF, Df) (down) and Qg.E(PointF, Df) (up):
+     * walks up from the cursor to the nearest fraction where the cursor sits in the numerator (down)
+     * or denominator (up), then hit-tests the opposite slot at the cursor x clamped by
+     * ZD.ab (0.2f) * density on each side.
+     */
+    public CursorPointer findVerticalCursorTarget(boolean down) {
+        if (currentRootVisual == null || cursorPointer == null || cursorPointer.node == null) {
+            return null;
+        }
+        MathVisual curr = findVisualForNode(currentRootVisual, cursorPointer.node);
+        if (curr == null) {
+            return null;
+        }
+        PointF p = curr.getCursorPosition(cursorPointer.position, textPaint);
+        if (p == null) {
+            return null;
+        }
+        float x = p.x;
+        float margin = 0.2f * getResources().getDisplayMetrics().density;
+        while (curr.parent != null) {
+            x += curr.HiPER.x; // now in parent coordinates
+            MathVisual parent = curr.parent;
+            if (parent instanceof com.calctastic.sample.hypercal.render.FractionVisual) {
+                com.calctastic.sample.hypercal.render.FractionVisual frac =
+                        (com.calctastic.sample.hypercal.render.FractionVisual) parent;
+                boolean inNumerator = curr == frac.numeratorVisual;
+                if (down == inNumerator) {
+                    MathVisual slot = down ? frac.denominatorVisual : frac.numeratorVisual;
+                    if (slot == null) {
+                        return null;
+                    }
+                    float cx = Math.max(margin + 1.0f, Math.min(x, (frac.b.x - margin) - 1.0f));
+                    float localX = Math.max(0.0f, Math.min(cx - slot.HiPER.x, slot.b.x));
+                    return slot.hitTest(new PointF(localX, slot.b.y / 2.0f), textPaint);
+                }
+            }
+            curr = parent;
+        }
+        return null;
     }
 
     private MathVisual findVisualForNode(MathVisual root, ExpressionNode target) {

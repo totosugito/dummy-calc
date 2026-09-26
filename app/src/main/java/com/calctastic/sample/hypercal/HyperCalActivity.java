@@ -6,6 +6,7 @@ import android.view.View;
 import android.widget.Button;
 import com.calctastic.sample.R;
 import com.calctastic.sample.hypercal.engine.model.CursorPointer;
+import com.calctastic.sample.hypercal.engine.model.EmptyNode;
 import com.calctastic.sample.hypercal.engine.model.ExpressionNode;
 import com.calctastic.sample.hypercal.engine.model.FractionNode;
 import com.calctastic.sample.hypercal.engine.model.NumberNode;
@@ -15,6 +16,8 @@ import com.calctastic.sample.hypercal.engine.model.PowerNode;
 import com.calctastic.sample.hypercal.engine.model.SequenceNode;
 import com.calctastic.sample.hypercal.engine.model.SqrtNode;
 import com.calctastic.sample.hypercal.view.HyperCalDisplayView;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * HyperCal Activity with HiPER Calc expression rendering.
@@ -90,7 +93,8 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
                 R.id.btn_sqrt, R.id.btn_fraction, R.id.btn_power, R.id.btn_square, R.id.btn_reciprocal,
                 R.id.btn_paren_open, R.id.btn_paren_close,
                 // Edit & Nav
-                R.id.btn_clear, R.id.btn_delete, R.id.btn_cursor_left, R.id.btn_cursor_right
+                R.id.btn_clear, R.id.btn_delete, R.id.btn_cursor_left, R.id.btn_cursor_right,
+                R.id.btn_cursor_up, R.id.btn_cursor_down
         };
 
         for (int id : buttonIds) {
@@ -132,69 +136,86 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
         else if (id == R.id.btn_delete) deleteChar();
         else if (id == R.id.btn_cursor_left) moveCursorLeft();
         else if (id == R.id.btn_cursor_right) moveCursorRight();
+        else if (id == R.id.btn_cursor_up) moveCursorVertical(false);
+        else if (id == R.id.btn_cursor_down) moveCursorVertical(true);
 
         updateFormulaText();
         displayView.invalidate();
     }
 
+
+    private void setCursor(CursorPointer pointer) {
+        cursorPointer = pointer;
+        displayView.setCursorPointer(pointer);
+    }
+
+    // ---- Fraction slot helpers: numerator/denominator are SequenceNode slots (HiPER GA inside C0067Lb) ----
+
+    /** Returns the fraction owning this slot sequence, or null if it is not a fraction slot. */
+    private static FractionNode fractionOfSlot(ExpressionNode slot) {
+        if (slot instanceof SequenceNode && slot.getParent() instanceof FractionNode) {
+            return (FractionNode) slot.getParent();
+        }
+        return null;
+    }
+
+    private static CursorPointer afterNode(ExpressionNode node) {
+        if (node instanceof FractionNode) return new CursorPointer(node, 1); // Center after fraction
+        if (node instanceof EmptyNode) return new CursorPointer(node, 0);
+        return new CursorPointer(node, node.getLength());
+    }
+
+    private static CursorPointer startOf(SequenceNode seq) {
+        if (seq.getChildCount() == 0) return new CursorPointer(seq, 0);
+        return new CursorPointer(seq.getChild(0), 0);
+    }
+
+    private static CursorPointer endOf(SequenceNode seq) {
+        if (seq.getChildCount() == 0) return new CursorPointer(seq, 0);
+        return afterNode(seq.getChild(seq.getChildCount() - 1));
+    }
+
+    /**
+     * Inserts a new token at the cursor inside the cursor's own sequence.
+     * An EmptyNode placeholder under the cursor is replaced (QA -> real token).
+     */
+    private void insertAtCursor(ExpressionNode node) {
+        if (cursorPointer == null || cursorPointer.node == null) {
+            rootSequence.add(node);
+            return;
+        }
+        if (cursorPointer.node instanceof SequenceNode) {
+            SequenceNode seq = (SequenceNode) cursorPointer.node;
+            int idx = Math.max(0, Math.min(cursorPointer.position, seq.getChildCount()));
+            seq.add(idx, node);
+            return;
+        }
+        ExpressionNode parent = cursorPointer.node.getParent();
+        if (parent instanceof SequenceNode) {
+            SequenceNode seq = (SequenceNode) parent;
+            int idx = seq.getChildIndex(cursorPointer.node);
+            if (cursorPointer.node instanceof EmptyNode) {
+                seq.removeChild(cursorPointer.node);
+                seq.add(idx, node);
+                return;
+            }
+            seq.add(cursorPointer.position == 0 ? idx : idx + 1, node);
+            return;
+        }
+        rootSequence.add(node);
+    }
+
     private void appendDigit(char c) {
-        if (cursorPointer != null && cursorPointer.node instanceof com.calctastic.sample.hypercal.engine.model.EmptyNode) {
-            com.calctastic.sample.hypercal.engine.model.EmptyNode empty = (com.calctastic.sample.hypercal.engine.model.EmptyNode) cursorPointer.node;
-            NumberNode num = new NumberNode(String.valueOf(c));
-            num.cursorPosition = 1;
-            if (empty.getParent() instanceof FractionNode) {
-                FractionNode frac = (FractionNode) empty.getParent();
-                if (empty == frac.numerator) {
-                    frac.numerator = num;
-                    num.setParent(frac);
-                } else if (empty == frac.denominator) {
-                    frac.denominator = num;
-                    num.setParent(frac);
-                }
-            } else if (empty.getParent() instanceof SequenceNode) {
-                SequenceNode seq = (SequenceNode) empty.getParent();
-                int idx = seq.getChildIndex(empty);
-                seq.removeChild(empty);
-                seq.add(idx, num);
-            }
-            cursorPointer = new CursorPointer(num, 1);
-            displayView.setCursorPointer(cursorPointer);
-        } else if (cursorPointer != null && cursorPointer.node instanceof FractionNode) {
-            // Typing while at Center baseline slot after/before fraction
-            FractionNode frac = (FractionNode) cursorPointer.node;
-            ExpressionNode parent = frac.getParent();
-            if (parent instanceof SequenceNode) {
-                SequenceNode seq = (SequenceNode) parent;
-                int idx = seq.getChildIndex(frac);
-                NumberNode num = new NumberNode(String.valueOf(c));
-                num.cursorPosition = 1;
-                if (cursorPointer.position == 0) {
-                    seq.add(idx, num);
-                } else {
-                    seq.add(idx + 1, num);
-                }
-                cursorPointer = new CursorPointer(num, 1);
-                displayView.setCursorPointer(cursorPointer);
-            }
-        } else if (cursorPointer != null && cursorPointer.node instanceof NumberNode) {
+        if (cursorPointer != null && cursorPointer.node instanceof NumberNode) {
             NumberNode num = (NumberNode) cursorPointer.node;
             num.insertChar(c);
-            cursorPointer = new CursorPointer(num, num.cursorPosition);
-            displayView.setCursorPointer(cursorPointer);
-        } else if (cursorPointer != null && cursorPointer.node instanceof SequenceNode) {
-            SequenceNode seq = (SequenceNode) cursorPointer.node;
-            NumberNode num = new NumberNode(String.valueOf(c));
-            num.cursorPosition = 1;
-            seq.addChild(num);
-            cursorPointer = new CursorPointer(num, 1);
-            displayView.setCursorPointer(cursorPointer);
-        } else {
-            NumberNode num = new NumberNode(String.valueOf(c));
-            num.cursorPosition = 1;
-            rootSequence.addChild(num);
-            cursorPointer = new CursorPointer(num, 1);
-            displayView.setCursorPointer(cursorPointer);
+            setCursor(new CursorPointer(num, num.cursorPosition));
+            return;
         }
+        NumberNode num = new NumberNode(String.valueOf(c));
+        num.cursorPosition = 1;
+        insertAtCursor(num);
+        setCursor(new CursorPointer(num, 1));
     }
 
     private void toggleNegate() {
@@ -208,70 +229,63 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
 
     private void appendOperator(String symbol) {
         OperatorNode op = new OperatorNode(symbol);
-        if (cursorPointer != null && cursorPointer.node != null && cursorPointer.node.getParent() instanceof SequenceNode) {
-            SequenceNode parent = (SequenceNode) cursorPointer.node.getParent();
-            int idx = parent.getChildIndex(cursorPointer.node);
-            parent.add(idx + 1, op);
-        } else {
-            rootSequence.addChild(op);
-        }
-        cursorPointer = new CursorPointer(op, 1);
-        displayView.setCursorPointer(cursorPointer);
+        insertAtCursor(op);
+        setCursor(new CursorPointer(op, 1));
     }
 
     private void insertSqrt() {
         NumberNode inner = new NumberNode("");
         SqrtNode sqrt = new SqrtNode(inner);
-        insertNodeAtCursor(sqrt);
-        cursorPointer = new CursorPointer(inner, 0);
-        displayView.setCursorPointer(cursorPointer);
+        insertAtCursor(sqrt);
+        setCursor(new CursorPointer(inner, 0));
+    }
+
+    /**
+     * True when the token right before the cursor is an operand that a/b can lift into the numerator.
+     * A fraction is not lifted: a/b right after a fraction starts a new empty fraction beside it.
+     */
+    private static boolean hasOperandBeforeCursor(CursorPointer cp) {
+        ExpressionNode n = cp.node;
+        if (n instanceof EmptyNode || n instanceof OperatorNode || n instanceof SequenceNode
+                || n instanceof FractionNode) {
+            return false;
+        }
+        return cp.position > 0;
     }
 
     /**
      * Faithful to HiPER Calc C0196hc.java & EA.m72HiPER:
-     * - If active token before cursor exists, it becomes numerator, denominator is empty, and cursor goes to denominator.
-     * - If cursor inside fraction numerator, pressing a/b jumps to denominator.
-     * - If empty/fresh, numerator is empty, denominator is empty, cursor goes to numerator.
+     * - Case 3: cursor inside the numerator -> a/b jumps to the denominator.
+     * - Case 1: an operand right before the cursor becomes the numerator, denominator is empty,
+     *   and the cursor goes to the denominator.
+     * - Case 2: nothing to lift (empty display, after an operator, on a placeholder) ->
+     *   both slots are empty boxes and the cursor goes to the numerator.
      */
     private void insertFraction() {
         if (cursorPointer != null && cursorPointer.node != null) {
-            // If already in numerator, pressing a/b jumps to denominator
-            if (cursorPointer.node.getParent() instanceof FractionNode) {
-                FractionNode parentFrac = (FractionNode) cursorPointer.node.getParent();
-                if (cursorPointer.node == parentFrac.numerator) {
-                    if (parentFrac.denominator != null) {
-                        cursorPointer = new CursorPointer(parentFrac.denominator, 0);
-                        displayView.setCursorPointer(cursorPointer);
-                        return;
-                    }
-                }
+            ExpressionNode slot = cursorPointer.node instanceof SequenceNode
+                    ? cursorPointer.node : cursorPointer.node.getParent();
+            FractionNode host = fractionOfSlot(slot);
+            if (host != null && slot == host.numerator) {
+                setCursor(startOf(host.denominator));
+                return;
             }
 
-            // Wrap prior node into numerator (C0196hc.java lines 347-363)
-            ExpressionNode targetNumerator = cursorPointer.node;
-            ExpressionNode parent = targetNumerator.getParent();
-            if (parent instanceof SequenceNode) {
-                SequenceNode seq = (SequenceNode) parent;
-                int idx = seq.getChildIndex(targetNumerator);
-                seq.removeChild(targetNumerator);
-
-                com.calctastic.sample.hypercal.engine.model.EmptyNode emptyDen = new com.calctastic.sample.hypercal.engine.model.EmptyNode();
-                FractionNode frac = new FractionNode(targetNumerator, emptyDen);
+            ExpressionNode target = cursorPointer.node;
+            if (hasOperandBeforeCursor(cursorPointer) && target.getParent() instanceof SequenceNode) {
+                SequenceNode seq = (SequenceNode) target.getParent();
+                int idx = seq.getChildIndex(target);
+                seq.removeChild(target);
+                FractionNode frac = new FractionNode(target, null);
                 seq.add(idx, frac);
-
-                cursorPointer = new CursorPointer(emptyDen, 0);
-                displayView.setCursorPointer(cursorPointer);
+                setCursor(startOf(frac.denominator));
                 return;
             }
         }
 
-        // Fresh fraction if no prior node: 2 empty boxes (QA in HiPER)
-        com.calctastic.sample.hypercal.engine.model.EmptyNode emptyNum = new com.calctastic.sample.hypercal.engine.model.EmptyNode();
-        com.calctastic.sample.hypercal.engine.model.EmptyNode emptyDen = new com.calctastic.sample.hypercal.engine.model.EmptyNode();
-        FractionNode frac = new FractionNode(emptyNum, emptyDen);
-        insertNodeAtCursor(frac);
-        cursorPointer = new CursorPointer(emptyNum, 0);
-        displayView.setCursorPointer(cursorPointer);
+        FractionNode frac = new FractionNode(null, null);
+        insertAtCursor(frac);
+        setCursor(startOf(frac.numerator));
     }
 
     private void insertPower() {
@@ -332,27 +346,15 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
         NumberNode one = new NumberNode("1");
         NumberNode den = new NumberNode("");
         FractionNode frac = new FractionNode(one, den);
-        insertNodeAtCursor(frac);
-        cursorPointer = new CursorPointer(den, 0);
-        displayView.setCursorPointer(cursorPointer);
+        insertAtCursor(frac);
+        setCursor(new CursorPointer(den, 0));
     }
 
     private void insertParenthesis() {
         NumberNode inner = new NumberNode("");
         ParenthesisNode paren = new ParenthesisNode(inner);
-        insertNodeAtCursor(paren);
-        cursorPointer = new CursorPointer(inner, 0);
-        displayView.setCursorPointer(cursorPointer);
-    }
-
-    private void insertNodeAtCursor(ExpressionNode node) {
-        if (cursorPointer != null && cursorPointer.node != null && cursorPointer.node.getParent() instanceof SequenceNode) {
-            SequenceNode parent = (SequenceNode) cursorPointer.node.getParent();
-            int idx = parent.getChildIndex(cursorPointer.node);
-            parent.add(idx + 1, node);
-        } else {
-            rootSequence.addChild(node);
-        }
+        insertAtCursor(paren);
+        setCursor(new CursorPointer(inner, 0));
     }
 
     private void clearAll() {
@@ -362,260 +364,234 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
         displayView.setCursorPointer(cursorPointer);
     }
 
+    /**
+     * Removes a token from its sequence and places the cursor where it was.
+     * A fraction slot that becomes empty gets its EmptyNode placeholder back.
+     */
+    private void removeFromSequence(ExpressionNode node) {
+        if (!(node.getParent() instanceof SequenceNode)) {
+            return;
+        }
+        SequenceNode seq = (SequenceNode) node.getParent();
+        int idx = seq.getChildIndex(node);
+        seq.removeChild(node);
+        if (seq.getChildCount() == 0) {
+            if (fractionOfSlot(seq) != null) {
+                EmptyNode empty = new EmptyNode();
+                seq.add(empty);
+                setCursor(new CursorPointer(empty, 0));
+            } else {
+                setCursor(new CursorPointer(seq, 0));
+            }
+        } else if (idx > 0) {
+            setCursor(afterNode(seq.getChild(idx - 1)));
+        } else {
+            setCursor(new CursorPointer(seq.getChild(0), 0));
+        }
+    }
+
+    /** DEL with the cursor at the start of {@code node}: deletes whatever sits right before it. */
+    private void deleteBefore(ExpressionNode node) {
+        if (!(node.getParent() instanceof SequenceNode)) {
+            return;
+        }
+        SequenceNode seq = (SequenceNode) node.getParent();
+        int idx = seq.getChildIndex(node);
+        if (idx <= 0) {
+            return;
+        }
+        ExpressionNode prev = seq.getChild(idx - 1);
+        if (prev instanceof FractionNode) {
+            // DEL right after a fraction steps into its denominator
+            setCursor(endOf(((FractionNode) prev).denominator));
+            return;
+        }
+        if (prev instanceof NumberNode && prev.getLength() > 0) {
+            NumberNode num = (NumberNode) prev;
+            num.cursorPosition = -1; // delete from the end
+            num.deleteChar();
+            if (num.getLength() == 0) {
+                seq.removeChild(num);
+            }
+        } else {
+            seq.removeChild(prev);
+        }
+        setCursor(new CursorPointer(node, 0));
+    }
+
+    /** Replaces a fraction whose denominator is empty with its numerator tokens (unwrapping). */
+    private void unwrapFraction(FractionNode frac) {
+        if (!(frac.getParent() instanceof SequenceNode)) {
+            return;
+        }
+        if (FractionNode.isEmptySlot(frac.numerator)) {
+            removeFromSequence(frac);
+            return;
+        }
+        SequenceNode seq = (SequenceNode) frac.getParent();
+        int idx = seq.getChildIndex(frac);
+        seq.removeChild(frac);
+        List<ExpressionNode> tokens = new ArrayList<>(frac.numerator.children);
+        for (int i = 0; i < tokens.size(); i++) {
+            seq.add(idx + i, tokens.get(i));
+        }
+        setCursor(afterNode(tokens.get(tokens.size() - 1)));
+    }
+
     private void deleteChar() {
-        // If on EmptyNode in Fraction
-        if (cursorPointer != null && cursorPointer.node instanceof com.calctastic.sample.hypercal.engine.model.EmptyNode) {
-            com.calctastic.sample.hypercal.engine.model.EmptyNode empty = (com.calctastic.sample.hypercal.engine.model.EmptyNode) cursorPointer.node;
-            if (empty.getParent() instanceof FractionNode) {
-                FractionNode frac = (FractionNode) empty.getParent();
-                if (empty == frac.denominator) {
-                    // DEL in empty denominator jumps to numerator
-                    cursorPointer = new CursorPointer(frac.numerator, frac.numerator.getLength());
-                    displayView.setCursorPointer(cursorPointer);
-                    return;
-                } else if (empty == frac.numerator) {
-                    // If numerator is empty and denominator is empty, remove fraction completely
-                    if (frac.denominator instanceof com.calctastic.sample.hypercal.engine.model.EmptyNode) {
-                        ExpressionNode fracParent = frac.getParent();
-                        if (fracParent instanceof SequenceNode) {
-                            SequenceNode seq = (SequenceNode) fracParent;
-                            int idx = seq.getChildIndex(frac);
-                            seq.removeChild(frac);
-                            if (seq.getChildCount() > 0) {
-                                int nextIdx = Math.max(0, idx - 1);
-                                ExpressionNode nextNode = seq.getChild(nextIdx);
-                                cursorPointer = new CursorPointer(nextNode, nextNode.getLength());
-                            } else {
-                                cursorPointer = new CursorPointer(seq, 0);
-                            }
-                            displayView.setCursorPointer(cursorPointer);
-                            return;
-                        }
-                    }
-                }
+        if (cursorPointer == null || cursorPointer.node == null) {
+            return;
+        }
+        ExpressionNode node = cursorPointer.node;
+
+        // Cursor directly on a sequence (e.g. empty root)
+        if (node instanceof SequenceNode) {
+            SequenceNode seq = (SequenceNode) node;
+            if (cursorPointer.position > 0 && cursorPointer.position <= seq.getChildCount()) {
+                removeFromSequence(seq.getChild(cursorPointer.position - 1));
             }
+            return;
         }
 
-        // If at Center baseline after fraction
-        if (cursorPointer != null && cursorPointer.node instanceof FractionNode) {
-            FractionNode frac = (FractionNode) cursorPointer.node;
+        // Center slot before/after a fraction
+        if (node instanceof FractionNode) {
+            FractionNode frac = (FractionNode) node;
             if (cursorPointer.position == 1) {
-                // DEL after fraction enters denominator
-                cursorPointer = new CursorPointer(frac.denominator, frac.denominator.getLength());
-                displayView.setCursorPointer(cursorPointer);
-                return;
-            } else {
-                // DEL before fraction removes previous item in sequence
-                if (frac.getParent() instanceof SequenceNode) {
-                    SequenceNode seq = (SequenceNode) frac.getParent();
-                    int idx = seq.getChildIndex(frac);
-                    if (idx > 0) {
-                        seq.removeChild(seq.getChild(idx - 1));
-                        cursorPointer = new CursorPointer(frac, 0);
-                        displayView.setCursorPointer(cursorPointer);
-                        return;
-                    }
-                }
-            }
-        }
-
-        if (cursorPointer != null && cursorPointer.node instanceof NumberNode) {
-            NumberNode num = (NumberNode) cursorPointer.node;
-            if (num.deleteChar()) {
-                cursorPointer = new CursorPointer(num, num.cursorPosition);
-                displayView.setCursorPointer(cursorPointer);
-                return;
-            }
-
-            // If number in denominator became empty, revert to EmptyNode
-            if (num.getParent() instanceof FractionNode) {
-                FractionNode frac = (FractionNode) num.getParent();
-                com.calctastic.sample.hypercal.engine.model.EmptyNode empty = new com.calctastic.sample.hypercal.engine.model.EmptyNode();
-                if (num == frac.denominator) {
-                    frac.denominator = empty;
-                    empty.setParent(frac);
-                    cursorPointer = new CursorPointer(empty, 0);
-                    displayView.setCursorPointer(cursorPointer);
-                    return;
-                } else if (num == frac.numerator) {
-                    frac.numerator = empty;
-                    empty.setParent(frac);
-                    cursorPointer = new CursorPointer(empty, 0);
-                    displayView.setCursorPointer(cursorPointer);
-                    return;
-                }
-            }
-        }
-
-        if (cursorPointer != null && cursorPointer.node != null && cursorPointer.node != rootSequence) {
-            ExpressionNode toRemove = cursorPointer.node;
-            ExpressionNode parent = toRemove.getParent();
-            if (parent instanceof SequenceNode) {
-                SequenceNode seq = (SequenceNode) parent;
-                int idx = seq.getChildIndex(toRemove);
-                seq.removeChild(toRemove);
-                if (seq.getChildCount() > 0) {
-                    int nextIdx = Math.max(0, idx - 1);
-                    ExpressionNode nextNode = seq.getChild(nextIdx);
-                    cursorPointer = new CursorPointer(nextNode, nextNode.getLength());
+                if (FractionNode.isEmptySlot(frac.denominator)) {
+                    unwrapFraction(frac);
                 } else {
-                    cursorPointer = new CursorPointer(seq, 0);
+                    setCursor(endOf(frac.denominator));
                 }
-                displayView.setCursorPointer(cursorPointer);
-                return;
+            } else {
+                deleteBefore(frac);
             }
+            return;
         }
 
-        if (rootSequence.getChildCount() > 0) {
-            rootSequence.removeChild(rootSequence.getChild(rootSequence.getChildCount() - 1));
-            if (rootSequence.getChildCount() > 0) {
-                ExpressionNode last = rootSequence.getChild(rootSequence.getChildCount() - 1);
-                cursorPointer = new CursorPointer(last, last.getLength());
+        // Empty placeholder box (QA)
+        if (node instanceof EmptyNode) {
+            FractionNode frac = fractionOfSlot(node.getParent());
+            if (frac == null) {
+                removeFromSequence(node);
+            } else if (node.getParent() == frac.denominator) {
+                // DEL in empty denominator jumps to the end of the numerator
+                setCursor(endOf(frac.numerator));
+            } else if (FractionNode.isEmptySlot(frac.denominator)) {
+                // Both slots empty: remove the whole fraction
+                removeFromSequence(frac);
             } else {
-                cursorPointer = new CursorPointer(rootSequence, 0);
+                // Numerator empty but denominator filled: keep the numerator box visible
+                setCursor(new CursorPointer(frac, 0));
             }
-            displayView.setCursorPointer(cursorPointer);
+            return;
+        }
+
+        if (node instanceof NumberNode) {
+            NumberNode num = (NumberNode) node;
+            if (num.deleteChar()) {
+                if (num.getLength() == 0 && num.getParent() instanceof SequenceNode) {
+                    // Number emptied: drop it (a fraction slot gets its EmptyNode back)
+                    removeFromSequence(num);
+                } else {
+                    setCursor(new CursorPointer(num, num.cursorPosition));
+                }
+                return;
+            }
+            if (num.getLength() > 0 || num.getParent() instanceof SequenceNode) {
+                deleteBefore(num);
+                return;
+            }
+            // Empty number inside sqrt/parenthesis/power: remove the wrapper
+            if (num.getParent() != null) {
+                removeFromSequence(num.getParent());
+            }
+            return;
+        }
+
+        removeFromSequence(node);
+    }
+
+    /** ▲ / ▼: numerator <-> denominator, faithful to Qg.HiPER(PointF, Df) / Qg.E(PointF, Df). */
+    private void moveCursorVertical(boolean down) {
+        CursorPointer target = displayView.findVerticalCursorTarget(down);
+        if (target != null) {
+            setCursor(target);
         }
     }
 
     private void moveCursorLeft() {
-        if (rootSequence.getChildCount() == 0 || cursorPointer == null) return;
+        if (cursorPointer == null || cursorPointer.node == null) return;
+        ExpressionNode node = cursorPointer.node;
 
         // Inside NumberNode: move left character-by-character
-        if (cursorPointer.node instanceof NumberNode && cursorPointer.position > 0) {
-            cursorPointer = new CursorPointer(cursorPointer.node, cursorPointer.position - 1);
-            displayView.setCursorPointer(cursorPointer);
+        if (node instanceof NumberNode && cursorPointer.position > 0) {
+            setCursor(new CursorPointer(node, cursorPointer.position - 1));
             return;
         }
 
-        // Inside FractionNode at position 1 (Center after fraction): step left into denominator
-        if (cursorPointer.node instanceof FractionNode && cursorPointer.position == 1) {
-            FractionNode frac = (FractionNode) cursorPointer.node;
-            ExpressionNode target = frac.denominator != null ? frac.denominator : frac.numerator;
-            cursorPointer = new CursorPointer(target, target.getLength());
-            displayView.setCursorPointer(cursorPointer);
+        // Center after fraction: step left into the end of the denominator
+        if (node instanceof FractionNode && cursorPointer.position == 1) {
+            setCursor(endOf(((FractionNode) node).denominator));
             return;
         }
 
-        // Inside Fraction denominator: left arrow jumps to end of numerator
-        if (cursorPointer.node != null && cursorPointer.node.getParent() instanceof FractionNode) {
-            FractionNode frac = (FractionNode) cursorPointer.node.getParent();
-            if (cursorPointer.node == frac.denominator) {
-                if (frac.numerator != null) {
-                    cursorPointer = new CursorPointer(frac.numerator, frac.numerator.getLength());
-                    displayView.setCursorPointer(cursorPointer);
-                    return;
-                }
-            } else if (cursorPointer.node == frac.numerator) {
-                // Left arrow from start of numerator steps out to Center before fraction
-                cursorPointer = new CursorPointer(frac, 0);
-                displayView.setCursorPointer(cursorPointer);
-                return;
-            }
+        if (!(node.getParent() instanceof SequenceNode)) return;
+        SequenceNode seq = (SequenceNode) node.getParent();
+        int idx = seq.getChildIndex(node);
+
+        if (idx > 0) {
+            setCursor(afterNode(seq.getChild(idx - 1)));
+            return;
         }
 
-        // Inside FractionNode at position 0 (Center before fraction): step left to previous token in sequence
-        if (cursorPointer.node instanceof FractionNode && cursorPointer.position == 0) {
-            FractionNode frac = (FractionNode) cursorPointer.node;
-            if (frac.getParent() instanceof SequenceNode) {
-                SequenceNode parent = (SequenceNode) frac.getParent();
-                int idx = parent.getChildIndex(frac);
-                if (idx > 0) {
-                    ExpressionNode prev = parent.getChild(idx - 1);
-                    if (prev instanceof FractionNode) {
-                        cursorPointer = new CursorPointer(prev, 1);
-                    } else {
-                        cursorPointer = new CursorPointer(prev, prev.getLength());
-                    }
-                    displayView.setCursorPointer(cursorPointer);
-                    return;
-                }
-            }
-        }
-
-        // Top-level sequence traversal
-        if (cursorPointer.node != null && cursorPointer.node.getParent() instanceof SequenceNode) {
-            SequenceNode parent = (SequenceNode) cursorPointer.node.getParent();
-            int idx = parent.getChildIndex(cursorPointer.node);
-            if (idx > 0) {
-                ExpressionNode prev = parent.getChild(idx - 1);
-                if (prev instanceof FractionNode) {
-                    cursorPointer = new CursorPointer(prev, 1); // Center after fraction
-                } else {
-                    cursorPointer = new CursorPointer(prev, prev.getLength());
-                }
-                displayView.setCursorPointer(cursorPointer);
+        // At the start of a fraction slot
+        FractionNode frac = fractionOfSlot(seq);
+        if (frac != null) {
+            if (seq == frac.denominator) {
+                setCursor(endOf(frac.numerator));
+            } else {
+                setCursor(new CursorPointer(frac, 0)); // Center before fraction
             }
         }
     }
 
     private void moveCursorRight() {
-        if (rootSequence.getChildCount() == 0 || cursorPointer == null) return;
+        if (cursorPointer == null || cursorPointer.node == null) return;
+        ExpressionNode node = cursorPointer.node;
 
         // Inside NumberNode: move right character-by-character
-        if (cursorPointer.node instanceof NumberNode && cursorPointer.position < cursorPointer.node.getLength()) {
-            cursorPointer = new CursorPointer(cursorPointer.node, cursorPointer.position + 1);
-            displayView.setCursorPointer(cursorPointer);
+        if (node instanceof NumberNode && cursorPointer.position < node.getLength()) {
+            setCursor(new CursorPointer(node, cursorPointer.position + 1));
             return;
         }
 
-        // Inside FractionNode at position 0 (Center before fraction): step right into numerator
-        if (cursorPointer.node instanceof FractionNode && cursorPointer.position == 0) {
-            FractionNode frac = (FractionNode) cursorPointer.node;
-            ExpressionNode target = frac.numerator != null ? frac.numerator : frac.denominator;
-            cursorPointer = new CursorPointer(target, 0);
-            displayView.setCursorPointer(cursorPointer);
+        // Center before fraction: step right into the start of the numerator
+        if (node instanceof FractionNode && cursorPointer.position == 0) {
+            setCursor(startOf(((FractionNode) node).numerator));
             return;
         }
 
-        // Inside Fraction numerator: right arrow jumps to start of denominator
-        if (cursorPointer.node != null && cursorPointer.node.getParent() instanceof FractionNode) {
-            FractionNode frac = (FractionNode) cursorPointer.node.getParent();
-            if (cursorPointer.node == frac.numerator) {
-                if (frac.denominator != null) {
-                    cursorPointer = new CursorPointer(frac.denominator, 0);
-                    displayView.setCursorPointer(cursorPointer);
-                    return;
-                }
-            } else if (cursorPointer.node == frac.denominator) {
-                // Right arrow from denominator steps out to Center after fraction
-                cursorPointer = new CursorPointer(frac, 1);
-                displayView.setCursorPointer(cursorPointer);
-                return;
+        if (!(node.getParent() instanceof SequenceNode)) return;
+        SequenceNode seq = (SequenceNode) node.getParent();
+        int idx = seq.getChildIndex(node);
+
+        if (idx >= 0 && idx < seq.getChildCount() - 1) {
+            ExpressionNode next = seq.getChild(idx + 1);
+            if (next instanceof NumberNode || next instanceof FractionNode || next instanceof EmptyNode) {
+                setCursor(new CursorPointer(next, 0));
+            } else {
+                setCursor(afterNode(next));
             }
+            return;
         }
 
-        // Inside FractionNode at position 1 (Center after fraction): step right to next node in Sequence
-        if (cursorPointer.node instanceof FractionNode && cursorPointer.position == 1) {
-            FractionNode frac = (FractionNode) cursorPointer.node;
-            if (frac.getParent() instanceof SequenceNode) {
-                SequenceNode parent = (SequenceNode) frac.getParent();
-                int idx = parent.getChildIndex(frac);
-                if (idx >= 0 && idx < parent.getChildCount() - 1) {
-                    ExpressionNode next = parent.getChild(idx + 1);
-                    if (next instanceof FractionNode) {
-                        cursorPointer = new CursorPointer(next, 0);
-                    } else {
-                        cursorPointer = new CursorPointer(next, 0);
-                    }
-                    displayView.setCursorPointer(cursorPointer);
-                    return;
-                }
-            }
-        }
-
-        // Top-level sequence traversal
-        if (cursorPointer.node != null && cursorPointer.node.getParent() instanceof SequenceNode) {
-            SequenceNode parent = (SequenceNode) cursorPointer.node.getParent();
-            int idx = parent.getChildIndex(cursorPointer.node);
-            if (idx >= 0 && idx < parent.getChildCount() - 1) {
-                ExpressionNode next = parent.getChild(idx + 1);
-                if (next instanceof FractionNode) {
-                    cursorPointer = new CursorPointer(next, 0); // Center before fraction
-                } else {
-                    cursorPointer = new CursorPointer(next, 0);
-                }
-                displayView.setCursorPointer(cursorPointer);
+        // At the end of a fraction slot
+        FractionNode frac = fractionOfSlot(seq);
+        if (frac != null) {
+            if (seq == frac.numerator) {
+                setCursor(startOf(frac.denominator));
+            } else {
+                setCursor(new CursorPointer(frac, 1)); // Center after fraction
             }
         }
     }
