@@ -241,13 +241,14 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
     }
 
     /**
-     * True when the token right before the cursor is an operand that a/b can lift into the numerator.
-     * A fraction is not lifted: a/b right after a fraction starts a new empty fraction beside it.
+     * True when the token right before the cursor is an operand that a/b can lift into the
+     * numerator. Any completed token qualifies, a fraction included: a/b right after a finished
+     * fraction nests it as the numerator of a new outer fraction (spec Section 2, Case 1 applies
+     * uniformly to "angka/token", not just numbers) -- e.g. 1/2 -> a/b -> (1/2)/[].
      */
     private static boolean hasOperandBeforeCursor(CursorPointer cp) {
         ExpressionNode n = cp.node;
-        if (n instanceof EmptyNode || n instanceof OperatorNode || n instanceof SequenceNode
-                || n instanceof FractionNode) {
+        if (n instanceof EmptyNode || n instanceof OperatorNode || n instanceof SequenceNode) {
             return false;
         }
         return cp.position > 0;

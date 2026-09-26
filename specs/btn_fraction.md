@@ -217,12 +217,15 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
   - **Temuan:** `C0357yG` (placeholder) tidak override `mo359HiPER`, jadi kursor di kotak kosong sebenarnya nongkrong di kiri kotak (`-w..0`), bukan di tengah seperti sebelumnya. Sudah dicek visual di emulator (`a/b` pada display kosong) — kursor persis di tepi kiri kotak pembilang.
   - `NumberVisual` posisi kursor antar-digit tetap dipertahankan seperti semula (bukan hasil decompile pasti — lihat catatan di bawah).
 - [ ] **Task 18: Verifikasi hit-test `Qg.HiPER(PointF,bool,bool)` via smali** — JADX gagal decompile; fragmen menunjukkan perbandingan ke titik tengah, bukan batas min/max anak.
-- [x] **Task 20: a/b tepat setelah pecahan membungkus pecahan itu sendiri (bug dari Task 7)**
-  - Repro: `a/b 1 ▶ 2 ▶ a/b` → `\frac{\frac{1}{2}}{□}`, kursor langsung di penyebut.
-  - Penyebab: `hasOperandBeforeCursor()` menganggap `FractionNode` (posisi 1) sebagai operand.
-  - Perbaikan: pecahan bukan operand → a/b membuat pecahan kosong baru di sebelahnya (`1/2 □/□`), kursor di pembilang baru.
-  - Selesai: uji `a/b 1 ▶ 2 ▶ a/b 7` → `\frac{1}{2}\frac{7}{□}`.
-  - Catatan: referensi `C0196hc.java` baris 347–363 ternyata transformasi ekspresi (evaluasi), bukan aksi tombol; perilaku asli HiPER untuk kasus ini belum terbukti.
+- [x] **Task 20: a/b tepat setelah pecahan — DIBALIK ke nesting (2026-09-26), lihat Task 20b**
+  - Riwayat: pertama kali "sibling" (`hasOperandBeforeCursor` mengecualikan `FractionNode`) untuk memperbaiki komplain awal ("kursor keluar pecahan, a/b malah mengisi penyebut otomatis").
+  - Efek samping sibling: dua pecahan bersebelahan berdempetan tanpa spasi (kode asli `C0329vH.mo63HiPER()` baris ~176: advance horizontal = `x += lebar elemen` saja, tidak ada mekanisme gap antar elemen sequence — `mo358HiPER()` yang tampak seperti margin ternyata dipakai untuk keputusan word-wrap, bukan spacing visual, dan `Qg`/Fraction tidak override itu).
+  - Setelah didiskusikan ulang (lihat Task 20b): teks spec Bagian 2 Kasus 1 ("angka/**token** sebelum kursor diangkat jadi pembilang") tidak mengecualikan pecahan → nesting lebih konsisten dengan aturan umum itu, dan otomatis menghilangkan masalah spasi (tidak ada lagi dua elemen bersebelahan tanpa operator).
+- [x] **Task 20b: a/b setelah pecahan → nesting (pecahan lama jadi pembilang pecahan baru)**
+  - Keputusan user (2026-09-26): `hasOperandBeforeCursor()` TIDAK mengecualikan `FractionNode` lagi — pecahan yang sudah selesai diperlakukan sama seperti token lain (Number/Sqrt/Power/Parenthesis).
+  - Hasil: `a/b 1 ▶ 2 ▶ a/b 7` → `\frac{\frac{1}{2}}{7}` (bukan lagi `\frac{1}{2}\frac{7}{□}`). Kursor setelah a/b langsung di penyebut pecahan baru.
+  - Diuji ulang: unwrap DEL (Task 19), navigasi ▲/▼ (Task 12), dan kasus dasar `1/2` semua masih benar setelah perubahan ini.
+  - Catatan: ini kebalikan dari komplain awal pengguna ("a/b otomatis mengisi penyebut" dianggap bug) — setelah dipertimbangkan ulang, itu ternyata perilaku yang benar secara teori, bukan bug. Referensi `C0196hc.java` baris 347–363 tetap belum konklusif (kode transformasi evaluasi, bukan aksi tombol), jadi ini keputusan desain berdasarkan konsistensi aturan spec, bukan bukti decompile langsung.
 - [x] **Task 19: Unwrapping pecahan** saat DEL di Center setelah pecahan.
   - Penyebut kosong → pecahan diganti isi pembilang, kursor di akhir isi tsb (pembilang juga kosong → pecahan dihapus). Penyebut terisi → kursor masuk ke akhir penyebut (seperti sebelumnya).
   - Uji: `5 a/b ▶ DEL 3` → `53`; `2 + a/b 1 ▶ ▶ DEL` → `2 + 1`.
