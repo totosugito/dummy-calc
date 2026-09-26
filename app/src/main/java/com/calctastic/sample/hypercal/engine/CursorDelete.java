@@ -56,9 +56,9 @@ public final class CursorDelete {
             return deleteBefore(frac, cursorPointer);
         }
 
-        // Center slot before/after a power (xʸ/x²/x³/x⁻¹). Sqrt/Parenthesis don't get this
-        // explicit dispatch yet -- deliberately left on the generic "delete whole node" fallback
-        // below, see specs/btn_fraction.md Section L.
+        // Center slot before/after a power (xʸ/x²/x³/x⁻¹) or a radical (√x/ⁿ√x). Parenthesis
+        // doesn't get this explicit dispatch yet -- deliberately left on the generic "delete
+        // whole node" fallback below, see specs/btn_fraction.md Section L.
         if (node instanceof PowerNode) {
             PowerNode pow = (PowerNode) node;
             if (cursorPointer.position == 0) {
@@ -73,6 +73,18 @@ public final class CursorDelete {
                 return deleteBefore(pow, cursorPointer);
             }
             return removeFromSequence(pow, cursorPointer);
+        }
+
+        // Same shape as PowerNode just above, added when √x/ⁿ√x became a first-class feature
+        // (previously sqrt sat on the generic "delete whole node regardless of position"
+        // fallback, same latent bug PowerNode had before the Section L fix -- see
+        // specs/btn_sqrt.md).
+        if (node instanceof SqrtNode) {
+            SqrtNode sqrt = (SqrtNode) node;
+            if (cursorPointer.position == 0) {
+                return deleteBefore(sqrt, cursorPointer);
+            }
+            return removeFromSequence(sqrt, cursorPointer);
         }
 
         // Empty placeholder box (QA)

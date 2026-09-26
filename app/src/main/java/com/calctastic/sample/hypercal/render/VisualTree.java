@@ -26,7 +26,14 @@ public final class VisualTree {
                 if (found != null) return found;
             }
         } else if (root instanceof SqrtVisual) {
-            return find(((SqrtVisual) root).radicandVisual, target);
+            // Degree first, matching reading order (and CursorNav.moveLeft/moveRight's own
+            // degree-before-radicand slot order) -- was previously only searching radicandVisual,
+            // silently unreachable for the degree slot as soon as a real n-th-root button started
+            // using SqrtNode.degree (see specs/btn_sqrt.md).
+            SqrtVisual sqrt = (SqrtVisual) root;
+            MathVisual f = find(sqrt.degreeVisual, target);
+            if (f != null) return f;
+            return find(sqrt.radicandVisual, target);
         } else if (root instanceof FractionVisual) {
             FractionVisual frac = (FractionVisual) root;
             MathVisual f = find(frac.integerVisual, target);

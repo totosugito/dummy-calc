@@ -108,6 +108,10 @@
                 android:text="√x"
                 style="@style/CalcSimpleButton.Function" />
             <Button
+                android:id="@+id/btn_nth_root"
+                android:text="ⁿ√x"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
                 android:id="@+id/btn_paren_open"
                 android:text="("
                 style="@style/CalcSimpleButton.Function" />

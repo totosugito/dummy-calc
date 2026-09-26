@@ -2,12 +2,12 @@ package com.calctastic.sample.hypercal.engine;
 
 import com.calctastic.sample.hypercal.engine.inserter.FractionInserter;
 import com.calctastic.sample.hypercal.engine.inserter.PowerInserter;
+import com.calctastic.sample.hypercal.engine.inserter.SqrtInserter;
 import com.calctastic.sample.hypercal.engine.model.CursorPointer;
 import com.calctastic.sample.hypercal.engine.model.NumberNode;
 import com.calctastic.sample.hypercal.engine.model.OperatorNode;
 import com.calctastic.sample.hypercal.engine.model.ParenthesisNode;
 import com.calctastic.sample.hypercal.engine.model.SequenceNode;
-import com.calctastic.sample.hypercal.engine.model.SqrtNode;
 
 /**
  * Keypad-driven editing of the expression AST: insertion, deletion, and left/right cursor
@@ -108,10 +108,11 @@ public class ExpressionEditor {
     }
 
     public void insertSqrt() {
-        NumberNode inner = new NumberNode("");
-        SqrtNode sqrt = new SqrtNode(inner);
-        CursorNav.insertAtCursor(rootSequence, cursorPointer, sqrt);
-        setCursor(new CursorPointer(inner, 0));
+        setCursor(SqrtInserter.insertSqrt(rootSequence, cursorPointer));
+    }
+
+    public void insertNthRoot() {
+        setCursor(SqrtInserter.insertNthRoot(rootSequence, cursorPointer));
     }
 
     public void insertFraction() {
