@@ -248,3 +248,11 @@ Semua task yang bisa dikerjakan di lingkungan ini sudah selesai. Yang tersisa:
 - **Task 10 (linear mode):** dinonaktifkan/ditunda atas permintaan user — jangan kerjakan tanpa instruksi eksplisit.
 - **Task 14 (placeholder tersembunyi):** ditunda — butuh subsistem mode + grammar fungsi/argumen yang tidak ada di sample ini.
 - **Task 18 (verifikasi hit-test via smali) & Display Task 12 (string `HcZgWQ.LiVE`):** diblokir kurangnya tooling smali (`apktool`/`baksmali`) di lingkungan ini, bukan soal effort.
+
+### E. Pemindahan Lokasi Kode (2026-09-26): `HyperCalActivity.java` dipecah
+`HyperCalActivity.java` sebelumnya 599 baris, mencampur wiring keypad Android dengan logika edit ekspresi murni. Semua logika insert/delete/navigasi kiri-kanan pada bagian ini (Task 6–9, 19, 20/20b) **dipindah** ke class baru:
+
+- **`engine/ExpressionEditor.java`** (baru) — isinya: `appendDigit`, `toggleNegate`, `appendOperator`, `insertSqrt`, `insertFraction` (+ `hasOperandBeforeCursor`), `insertPower`, `insertSquare`, `insertReciprocal`, `insertParenthesis`, `deleteChar` (+ `deleteBefore`, `removeFromSequence`, `unwrapFraction`), `moveCursorLeft`, `moveCursorRight`, dan helper slot pecahan (`fractionOfSlot`, `afterNode`, `startOf`, `endOf`, `insertAtCursor`). Class ini tidak bergantung pada Android (tidak ada `View`/`Paint`), jadi kalau task selanjutnya butuh pengujian unit murni atas logika pecahan, ini tempatnya.
+- **`HyperCalActivity.java`** (tersisa 163 baris) — sekarang cuma wiring keypad (`setupKeypad`, `onClick` mendelegasikan ke `editor.xxx()`) dan `moveCursorVertical` (Task 12), yang **tetap di Activity** karena butuh `HyperCalDisplayView.findVerticalCursorTarget` (perlu pohon visual + `Paint`, tidak bisa pindah ke `ExpressionEditor` yang bebas-Android).
+
+**Kalau mencari kode terkait task di atas sekarang:** logika insert/delete/navigasi kiri-kanan pecahan ada di `engine/ExpressionEditor.java`, bukan `HyperCalActivity.java` lagi. Navigasi atas/bawah (Task 12) tetap di `HyperCalActivity.moveCursorVertical` + `HyperCalDisplayView.findVerticalCursorTarget`.
