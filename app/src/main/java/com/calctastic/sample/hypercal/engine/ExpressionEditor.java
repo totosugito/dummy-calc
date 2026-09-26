@@ -291,10 +291,29 @@ public class ExpressionEditor {
         }
     }
 
+    /**
+     * "1/x" reciprocal button -- not part of the original HiPER Calc keypad (no decompiled
+     * reference), designed to match the existing a/b conventions instead: see
+     * specs/btn_1_per_x.md for the reasoning. An operand right before the cursor becomes the
+     * denominator of "1/x" (like a/b's Case 1), cursor lands right after the fraction. With
+     * nothing to wrap, falls back to an empty "1/[]" placeholder, cursor in the denominator.
+     */
     public void insertReciprocal() {
-        NumberNode one = new NumberNode("1");
+        if (cursorPointer != null && cursorPointer.node != null
+                && hasOperandBeforeCursor(cursorPointer)
+                && cursorPointer.node.getParent() instanceof SequenceNode) {
+            ExpressionNode target = cursorPointer.node;
+            SequenceNode seq = (SequenceNode) target.getParent();
+            int idx = seq.getChildIndex(target);
+            seq.removeChild(target);
+            FractionNode frac = new FractionNode(new NumberNode("1"), target);
+            seq.add(idx, frac);
+            setCursor(afterNode(frac));
+            return;
+        }
+
         NumberNode den = new NumberNode("");
-        FractionNode frac = new FractionNode(one, den);
+        FractionNode frac = new FractionNode(new NumberNode("1"), den);
         insertAtCursor(frac);
         setCursor(new CursorPointer(den, 0));
     }

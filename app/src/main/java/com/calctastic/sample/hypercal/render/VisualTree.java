@@ -29,7 +29,9 @@ public final class VisualTree {
             return find(((SqrtVisual) root).radicandVisual, target);
         } else if (root instanceof FractionVisual) {
             FractionVisual frac = (FractionVisual) root;
-            MathVisual f = find(frac.numeratorVisual, target);
+            MathVisual f = find(frac.integerVisual, target);
+            if (f != null) return f;
+            f = find(frac.numeratorVisual, target);
             if (f != null) return f;
             return find(frac.denominatorVisual, target);
         } else if (root instanceof PowerVisual) {
