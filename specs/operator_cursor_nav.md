@@ -1,54 +1,56 @@
-# Bug: Navigasi Kursor "Macet" Saat Melewati Operator (+, −, ×, ÷)
+# Bug: Cursor Navigation "Stuck" When Crossing an Operator (+, −, ×, ÷)
 
-Bukan spec per-tombol — ini bug navigasi kursor global, berlaku untuk semua `OperatorNode`
-(`+`, `−`, `×`, `÷`, dan operator lain apa pun yang direpresentasikan lewat class yang sama).
+Not a per-button spec — this is a global cursor-navigation bug, applying to every `OperatorNode`
+(`+`, `−`, `×`, `÷`, and any other operator represented by the same class).
 
-## Laporan user
+## User report
 
-Pada ekspresi `4 + 3`, menggerakkan kursor ke kiri (◀) butuh **2 kali klik** untuk melewati tanda
-`+` — padahal seharusnya cukup 1 kali (operator cuma simbol tunggal, tidak ada isi di dalamnya untuk
-dijelajahi). Dikonfirmasi user juga muncul di operator lain (`−`, `×`, `÷`), bukan cuma `+`.
+On the expression `4 + 3`, moving the cursor left (◀) took **2 clicks** to pass the `+` sign — when
+it should only take 1 (an operator is just a single symbol, with no content inside it to explore).
+Confirmed by the user to also happen with the other operators (`−`, `×`, `÷`), not just `+`.
 
-## Root cause (diverifikasi via screenshot per-langkah di emulator)
+## Root cause (verified via step-by-step screenshots on the emulator)
 
-`ExpressionEditor.moveCursorLeft/Right` dulu memberi `OperatorNode` posisi kursor sendiri (0 dan 1,
-lewat `afterNode()` default `CursorPointer(node, node.getLength())`), padahal:
-1. Kedua posisi itu **dirender di titik yang persis sama secara visual** (karena `OperatorNode` tidak
-   override `getCursorPosition`, jadi pakai formula default `MathVisual` yang untuk objek sekecil
-   simbol operator praktis tidak membedakan "kiri" vs "kanan" secara terlihat).
-2. Navigasi kiri/kanan **tidak pernah benar-benar memakai posisi operator itu sendiri** — begitu
-   kursor "di atas" operator (posisi berapa pun), tekan panah berikutnya selalu lompat ke sibling
-   sebelum/sesudahnya. Jadi posisi kedua itu murni beban mati (dead state) yang kebetulan digambar di lokasi yang sama dengan batas token tetangganya — user merasa 1 klik "tidak
-   ngapa-ngapain" (padahal state model-nya berubah, cuma tidak terlihat).
+`ExpressionEditor.moveCursorLeft/Right` used to give `OperatorNode` its own two cursor positions (0
+and 1, via `afterNode()`'s default `CursorPointer(node, node.getLength())`), even though:
+1. Both positions **render at the exact same visual point** (because `OperatorNode` doesn't
+   override `getCursorPosition`, so it uses `MathVisual`'s default formula, which for an object as
+   small as an operator symbol effectively doesn't distinguish "left" vs. "right" visually).
+2. Left/right navigation **never actually uses the operator's own position** — once the cursor is
+   "on" the operator (at either position), the next arrow press always jumps to the sibling
+   before/after it. So that second position was pure dead weight that happened to render at the
+   same spot as the boundary of the neighboring token — the user felt like 1 click "did nothing"
+   (even though the model state did change, just invisibly).
 
-Percobaan pertama (cuma mengubah `afterNode()` supaya `OperatorNode` selalu posisi 0, meniru
-`EmptyNode`) **belum cukup** — cuma memindahkan masalah, bukan menghilangkan: klik "macet" pindah ke
-pasangan state lain (`CursorPointer(operator, 0)` vs `CursorPointer(angkaSebelumnya, akhir)`), yang
-render-nya JUGA di titik yang sama (batas antara angka dan operator). Baru ketahuan setelah
-screenshot per-langkah dibandingkan satu-satu — pentingnya verifikasi visual, bukan cuma baca kode.
+The first attempt (just changing `afterNode()` so `OperatorNode` always sits at position 0, mirroring
+`EmptyNode`) **wasn't enough** — it just moved the problem, rather than removing it: the "stuck"
+click moved to a different pair of states (`CursorPointer(operator, 0)` vs.
+`CursorPointer(previousNumber, end)`), which ALSO render at the same spot (the boundary between the
+number and the operator). Only discovered after comparing step-by-step screenshots one by one — a
+reminder of why visual verification matters, not just reading the code.
 
-## Perbaikan final
+## Final fix
 
-Operator sekarang **tidak pernah jadi tempat singgah kursor sendiri sama sekali** — navigasi
-kiri/kanan pada level sequence (`ExpressionEditor.moveCursorLeft/Right`) mendeteksi kalau sibling
-yang mau dituju adalah `OperatorNode`, dan langsung lompat SATU LANGKAH LEBIH JAUH lagi (ke sibling
-di seberang operator itu), bukan berhenti di operatornya:
-- `moveCursorLeft`: kalau sibling sebelumnya adalah operator, lompat ke `afterNode(sibling
-  sebelum-sebelumnya)` (atau ke awal sequence kalau operator itu token pertama).
-- `moveCursorRight`: kalau sibling berikutnya adalah operator, lompat ke `enterFromLeft(sibling
-  sesudah-sesudahnya)` (helper baru, generalisasi cek "cara masuk dari kiri" yang tadinya inline) —
-  atau ke akhir sequence kalau operator itu token terakhir (mis. `4 +` yang belum lengkap).
+Operators now **never become a cursor stop of their own** — left/right navigation at the sequence
+level (`ExpressionEditor.moveCursorLeft/Right`) detects when the sibling it's about to land on is an
+`OperatorNode`, and immediately jumps ONE STEP FURTHER (to the sibling on the other side of that
+operator), rather than stopping on the operator itself:
+- `moveCursorLeft`: if the previous sibling is an operator, jump to `afterNode(the sibling before
+  that)` (or to the start of the sequence if that operator is the first token).
+- `moveCursorRight`: if the next sibling is an operator, jump to `enterFromLeft(the sibling after
+  that)` (new helper, a generalization of the inline "how to enter from the left" check) — or to
+  the end of the sequence if that operator is the last token (e.g. an incomplete `4 +`).
 
-`afterNode()` juga tetap diberi fallback posisi tunggal untuk `OperatorNode` (seperti `EmptyNode`)
-untuk kasus pemanggilan lain (mis. lewat `endOf`/unwrap fraction) yang mungkin kebetulan mengenai
-operator — jaga-jaga, bukan jalur utama perbaikan.
+`afterNode()` still gives `OperatorNode` a fallback single position (like `EmptyNode`) for other
+call sites (e.g. via `endOf`/unwrap fraction) that might happen to land on an operator — just in
+case, not the main path of the fix.
 
-## Verifikasi
+## Verification
 
-Diuji di emulator dengan screenshot per-langkah (bukan cuma baca teks LaTeX, karena itu tidak
-menunjukkan posisi kursor): `4 + 3`, tekan ◀ tiga kali dari akhir "3" → tiap klik sekarang
-menghasilkan posisi kursor yang **jelas berbeda secara visual** (akhir³→awal³→akhir4→awal4), tidak
-ada lagi klik yang terlihat diam di tempat. Diuji juga arah ▶ (mirror), operator lain (`−`, `×`,
-`÷`), kasus tepi (operator sebagai token pertama/terakhir dalam ekspresi belum lengkap), dan regresi
-penuh (pecahan, mixed number, 1/x, x², xʸ, kombinasi bersarang) — semua masih benar, tidak ada
-crash.
+Tested on the emulator with step-by-step screenshots (not just reading the LaTeX text, since that
+doesn't show cursor position): `4 + 3`, pressing ◀ three times from the end of "3" → each click now
+produces a **clearly different visual position** (end-of-3 → start-of-3 → end-of-4 → start-of-4), no
+more clicks that visibly stay in place. Also tested the ▶ direction (mirror), the other operators
+(`−`, `×`, `÷`), edge cases (operator as the first/last token in an incomplete expression), and full
+regression (fractions, mixed numbers, 1/x, x², xʸ, nested combinations) — all still correct, no
+crashes.

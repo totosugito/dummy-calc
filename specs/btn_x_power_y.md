@@ -1,241 +1,251 @@
-# Tombol "xʸ" (General Power)
+# "xʸ" Button (General Power)
 
-## A. Status di kode asli
+## A. Status in the original code
 
-Ada di kode asli, terdaftar sebagai token "POWY" (`EnumC0209ia.java:433`), tipe node
-`EnumC0300sa.dd`. Beda dengan `x²`/`x³` (`K`/`qB`, lihat `btn_x_square.md`) yang cuma menyimpan
-base sebagai child tunggal dengan exponent konstanta terkunci, node `dd` punya **2 child sungguhan**
-(base & exponent, keduanya beneran node yang bisa dibaca lewat index — `EA.java` `m72HiPER`
-±baris 2821-2833, `m74HiPER` ±baris 1749) — jadi exponent-nya memang didesain editable, konsisten
-dengan implementasi kita.
+Exists in the original code, registered as token "POWY" (`EnumC0209ia.java:433`), node type
+`EnumC0300sa.dd`. Unlike `x²`/`x³` (`K`/`qB`, see `btn_x_square.md`) which only store the base as a
+single child with a locked constant exponent, node `dd` has **2 real children** (base & exponent,
+both actual nodes readable by index — `EA.java` `m72HiPER` ±lines 2821-2833, `m74HiPER` ±line 1749)
+— so its exponent is indeed designed to be editable, consistent with our implementation.
 
-**Tapi:** logika klik-tombol (bagian mana yang jadi "base" saat diklik, apakah base langsung
-dibungkus kurung, dll.) **tidak ada di source `android.core`** — sudah dicari lewat semua referensi
-`EnumC0300sa.dd` (29 file) dan token "POWY" (3 file, semuanya cuma string template parser, bukan
-kode insersi). Package ini murni mesin CAS/matematika (konstruksi & evaluasi tree), bukan kode
-UI/keypad. Jadi bagian "apa yang terjadi saat tombol xʸ diklik" **tidak bisa diverifikasi dari
-decompile** — desain di bawah berdasarkan konfirmasi langsung dari user yang membandingkan dengan
-app asli, bukan dari source.
+**But:** the button-click logic (which part becomes the "base" on click, whether the base gets
+wrapped in parentheses, etc.) **isn't in the `android.core` source** — already searched across all
+references to `EnumC0300sa.dd` (29 files) and the token "POWY" (3 files, all just string-template
+parsers, not insertion code). This package is purely the CAS/math engine (tree construction &
+evaluation), not UI/keypad code. So "what happens when the xʸ button is clicked" **can't be
+verified from decompile** — the design below is based on direct confirmation from the user
+comparing against the real app, not from source.
 
-## B. Perilaku (dikonfirmasi user dari app asli, 2026-09-26)
+## B. Behavior (confirmed by the user against the real app, 2026-09-26)
 
-User melaporkan bug: tombol xʸ di app kita hasilnya salah — masih pakai logika lama (asal bungkus
-`cursorPointer.node` apa adanya, tanpa kurung). Setelah dicek ke app asli:
+User reported a bug: the xʸ button in our app produced wrong results — it was still using the old
+logic (just wrapping `cursorPointer.node` as-is, with no parentheses). After checking against the
+real app:
 
-- **Klik xʸ tanpa ada apa-apa buat diangkat → hasilnya `(□)^□`** (base kosong **dibungkus kurung**,
-  exponent kosong) — bukan `□^□` tanpa kurung.
-- **Konfirmasi user:** kurung base ini muncul **konsisten sesuai pola a/b Kasus 1/2** — kalau ada
-  operand tepat sebelum kursor, operand itu diangkat jadi base (dibungkus kurung, mis. `5` → xʸ →
-  `(5)^□`, kursor di exponent). Kalau tidak ada apa-apa (awal ekspresi / tepat setelah operator),
-  base kosong DAN exponent kosong sama-sama muncul sebagai kotak placeholder: `(□)^□`, kursor di
-  base (supaya user isi base dulu, baru pindah ke exponent).
-- Ini beda dari `x²`/`x³`/`x⁻¹` yang basenya **tidak** dibungkus kurung (lihat `btn_x_square.md`) —
-  cuma `xʸ` yang selalu pakai kurung di base.
+- **Clicking xʸ with nothing to lift → produces `(□)^□`** (the empty base is **wrapped in
+  parentheses**, exponent empty) — not `□^□` without parentheses.
+- **User confirmation:** these base parentheses appear **consistently following the a/b Case 1/2
+  pattern** — if there's an operand right before the cursor, that operand gets lifted into the base
+  (wrapped in parentheses, e.g. `5` → xʸ → `(5)^□`, cursor in the exponent). If there's nothing
+  (start of expression / right after an operator), both an empty base AND an empty exponent show up
+  as placeholder boxes: `(□)^□`, cursor in the base (so the user fills the base first, then moves to
+  the exponent).
+- This differs from `x²`/`x³`/`x⁻¹`, whose base is **not** wrapped in parentheses (see
+  `btn_x_square.md`) — only `xʸ` always uses parentheses on the base.
 
-## C. Implementasi
+## C. Implementation
 
-`engine/ExpressionEditor.insertPower()` (ditulis ulang, bukan lagi lewat helper `insertPowerNode`
-yang dipakai x²/x³/x⁻¹ — beda base-selection & parens):
-- Operand sebelum kursor (`hasOperandBeforeCursor`, sama seperti a/b) → diangkat, dibungkus
-  `ParenthesisNode`, jadi base dari `PowerNode(ParenthesisNode(operand), exponent kosong)`, kursor
-  di exponent.
-- Tidak ada apa-apa → `PowerNode(ParenthesisNode(NumberNode("")), NumberNode(""))` disisipkan di
-  kursor, kursor di base (di dalam kurung).
+`engine/ExpressionEditor.insertPower()` (rewritten, no longer going through the `insertPowerNode`
+helper used by x²/x³/x⁻¹ — different base-selection & parens):
+- Operand before the cursor (`hasOperandBeforeCursor`, same as a/b) → lifted, wrapped in
+  `ParenthesisNode`, becomes the base of `PowerNode(ParenthesisNode(operand), empty exponent)`,
+  cursor in the exponent.
+- Nothing → `PowerNode(ParenthesisNode(NumberNode("")), NumberNode(""))` inserted at the cursor,
+  cursor in the base (inside the parentheses).
 
-Diuji di emulator:
-- Fresh: `xʸ` → `()^{}` (representasi debug LaTeX untuk `(□)^□` — kotak kosong dirender sebagai
-  string kosong untuk `NumberNode("")`, bukan simbol `\square` seperti `EmptyNode` di slot pecahan;
-  ini konvensi lama yang sudah dipakai `insertSqrt`/`insertParenthesis` sebelum sesi ini, bukan
-  perubahan baru).
+Tested on the emulator:
+- Fresh: `xʸ` → `()^{}` (debug LaTeX representation of `(□)^□` — the empty box is rendered as an
+  empty string for `NumberNode("")`, not the `\square` symbol like `EmptyNode` in fraction slots;
+  this is an old convention already used by `insertSqrt`/`insertParenthesis` before this session,
+  not a new change).
 - Lift: `5` → `xʸ` → `3` → `(5)^{3}`.
-- Setelah operator (tidak ada operand): `2 +` → `xʸ` → `3` → `2 + (3)^{}` (angka `3` masuk ke base,
-  bukan salah-angkat `+`).
-- Nesting: `1/2` → `▶▶` → `xʸ` → `3` → `(\frac{1}{2})^{3}` (pecahan yang sudah selesai ikut
-  diangkat jadi base, konsisten dengan keputusan nesting Task 20b di `btn_fraction.md`).
+- After an operator (no operand): `2 +` → `xʸ` → `3` → `2 + (3)^{}` (the `3` goes into the base, not
+  incorrectly lifting the `+`).
+- Nesting: `1/2` → `▶▶` → `xʸ` → `3` → `(\frac{1}{2})^{3}` (a completed fraction gets lifted into the
+  base too, consistent with the Task 20b nesting decision in `btn_fraction.md`).
 
-## D. Bug yang ditemukan & diperbaiki di sepanjang jalan: helper `insertPowerNode` (dipakai x²/x³/x⁻¹)
+## D. Bug found & fixed along the way: the `insertPowerNode` helper (used by x²/x³/x⁻¹)
 
-Saat pertama kali merefactor `insertPower`/`insertSquare` jadi satu helper `insertPowerNode()`
-(sebelum tahu soal kurung xʸ), urutan operasinya salah: `PowerNode` dibuat (yang meng-assign ulang
-`parent` si base ke `PowerNode` itu sendiri, lewat constructor) **sebelum** mengecek
-`targetBase.getParent() instanceof SequenceNode`. Akibatnya pengecekan itu melihat parent yang sudah
-berubah (jadi `PowerNode`, bukan `SequenceNode` lagi), masuk ke cabang yang salah, dan node lama
-tidak pernah dihapus dari sequence induknya — jadi `5` → `x²` menghasilkan `55^{2}` (angka "5" lama
-tertinggal di tempat + "5" yang sama juga jadi base pangkat).
+When `insertPower`/`insertSquare` were first refactored into one shared helper `insertPowerNode()`
+(before the xʸ-parentheses issue was known), the operation order was wrong: `PowerNode` was
+constructed (which reassigns the base's `parent` to the `PowerNode` itself, via the constructor)
+**before** checking whether `targetBase.getParent() instanceof SequenceNode`. As a result that check
+saw the already-changed parent (now `PowerNode`, no longer `SequenceNode`), took the wrong branch,
+and the old node never got removed from its parent sequence — so `5` → `x²` produced `55^{2}` (the
+old "5" left in place, plus the same "5" also became the power's base).
 
-Diperbaiki dengan menentukan parent/index dan `removeChild` **sebelum** membuat `PowerNode` baru
-(urutan yang sama seperti kode asli sebelum refactor). Sudah diuji ulang: `5` → `x²` → `5^{2}` (benar).
-Bug ini murni kesalahan urutan kode kita sendiri saat refactor, bukan temuan dari kode asli.
+Fixed by resolving the parent/index and calling `removeChild` **before** constructing the new
+`PowerNode` (the same order as the original pre-refactor code). Re-tested: `5` → `x²` → `5^{2}`
+(correct). This bug was purely our own ordering mistake during the refactor, not a decompile
+finding.
 
-## E. Bug lanjutan (2026-09-26): kotak exponent kosong kegedean & navigasi base↔exponent tidak jalan
+## E. Follow-up bug (2026-09-26): the empty exponent box was oversized, and base↔exponent navigation didn't work
 
-Dua laporan user setelah kotak placeholder untuk `NumberNode` kosong ditambahkan (lihat
-`btn_1_per_x.md`... tidak, lihat catatan di `render/NumberVisual.java`):
+Two user reports after the empty-box placeholder was added for empty `NumberNode`s (see
+`btn_1_per_x.md`... no wait, see the note in `render/NumberVisual.java`):
 
-**E.1 Kotak exponent kosong kegedean.** Root cause dicek langsung ke `C0357yG.java` (placeholder asli)
-lewat subagent: rumus tinggi kotaknya emang punya `0.9f * density` — nilai **piksel absolut, tidak
-ikut mengecil** kalau elemen di-scale kecil (beda dari ascent/descent yang otomatis ikut scale text
-size). Ini rumus asli yang sama persis kita pakai (faithful), TAPI dikonfirmasi juga: `C0294rh.java`
-(NumberVisual asli) **tidak pernah** menggambar kotak untuk angka kosong sama sekali — kotak kosong di
-kode asli cuma ada di `C0357yG`/`QA`, dan `C0311tf.java` (layout exponent) tidak py logika kotak-kosong
-apa pun. Jadi kombinasi "kotak kosong di dalam exponent yang di-scale kecil" ini **tidak py padanan
-di kode asli** untuk dicontek — HiPER kemungkinan besar tidak pernah menampilkan kotak kosong dalam
-konteks superscript sama sekali. Karena kita sengaja menambah fitur ini (supaya exponent kosong `x^y`
-juga kelihatan sebagai kotak, konsisten dengan a/b), perbaikannya: kalikan `0.9f * density` dengan
-skala elemen (`D`) di `NumberVisual.calculateLayout`, supaya kotak ikut mengecil proporsional saat
-di-nest dalam konteks kecil (exponent, dst.) — ini **penyimpangan sengaja** dari rumus asli, bukan
-salah port, karena skenario yang dituju memang tidak ada di kode asli.
+**E.1 Empty exponent box oversized.** Checked directly against `C0357yG.java` (the original
+placeholder) via subagent: the box-height formula does use `0.9f * density` — an **absolute pixel
+value that doesn't shrink** when the element is scaled down (unlike ascent/descent, which
+automatically follow the text size scale). This is the original formula and we use exactly the
+same one (faithful), BUT it was also confirmed: `C0294rh.java` (the original `NumberVisual`) **never
+draws a box for an empty number at all** — the empty box in the original code only exists in
+`C0357yG`/`QA`, and `C0311tf.java` (exponent layout) has no empty-box logic at all. So the
+combination "empty box inside an exponent that's been scaled down" **has no counterpart** in the
+original code to reference — HiPER most likely never shows an empty box in a superscript context at
+all. Since we deliberately added this feature (so an empty `x^y` exponent also shows as a box,
+consistent with a/b), the fix: multiply `0.9f * density` by the element's scale factor (`D`) in
+`NumberVisual.calculateLayout`, so the box shrinks proportionally when nested in a small context
+(exponent, etc.) — this is a **deliberate deviation** from the original formula, not a porting
+mistake, since the scenario in question doesn't exist in the original code to copy from.
 
-**E.2 Navigasi kiri/kanan/atas/bawah tidak bisa pindah base↔exponent.** `ExpressionEditor.moveCursorLeft/
-Right` sebelumnya cuma tahu cara masuk/keluar slot pecahan (`FractionNode`) — untuk `PowerNode` (base/
-exponent) dan `ParenthesisNode` (content), begitu `node.getParent()` bukan `SequenceNode`, fungsinya
-langsung `return` tanpa berbuat apa-apa. Ditambahkan penanganan simetris seperti pecahan: helper baru
-`startOfNode`/`endOfNode` (versi generik `startOf`/`endOf` yang menerima node tunggal, bukan cuma
-`SequenceNode`, karena base/exponent power & content parenthesis di implementasi kita bukan
-`SequenceNode`-wrapped seperti slot pecahan), lalu cabang baru di kedua arah untuk:
-- Masuk/keluar `PowerNode` di posisi Center (`position 0` = sebelum, `1` = sesudah), meniru pola
-  `FractionNode` yang sudah ada.
-- Masuk/keluar `ParenthesisNode` di posisi Center juga.
-- Lompat dari base ke exponent (dan sebaliknya) saat keluar dari salah satu slot itu.
+**E.2 Left/right/up/down navigation couldn't move between base↔exponent.** `ExpressionEditor.
+moveCursorLeft/Right` previously only knew how to enter/exit fraction slots (`FractionNode`) — for
+`PowerNode` (base/exponent) and `ParenthesisNode` (content), once `node.getParent()` wasn't a
+`SequenceNode`, the function just `return`ed without doing anything. Added symmetric handling like
+fractions: new helpers `startOfNode`/`endOfNode` (a generic version of `startOf`/`endOf` that takes
+a single node rather than just a `SequenceNode`, because our implementation's power base/exponent &
+parenthesis content aren't `SequenceNode`-wrapped like fraction slots), plus new branches in both
+directions for:
+- Entering/exiting a `PowerNode` at Center position (`position 0` = before, `1` = after), mirroring
+  the existing `FractionNode` pattern.
+- Entering/exiting a `ParenthesisNode` at Center too.
+- Jumping from base to exponent (and back) when exiting either slot.
 
-Karena base `xʸ` dibungkus `ParenthesisNode` (lihat Bagian C), keluar dari base perlu **2 kali tekan**
-◀/▶ (satu untuk keluar isi angka, satu lagi untuk keluar kurungnya) sebelum masuk ke exponent — ini
-konsekuensi struktur bersarang yang wajar (persis seperti pecahan bersarang butuh beberapa kali tekan
-buat keluar semua level), bukan bug.
+Because the xʸ base is wrapped in a `ParenthesisNode` (see Section C), exiting the base needs **2
+presses** of ◀/▶ (one to exit the number content, one more to exit the parentheses) before entering
+the exponent — this is a natural consequence of the nested structure (exactly like a nested fraction
+needing several presses to exit every level), not a bug.
 
-**Navigasi atas/bawah (▲/▼):** ditambahkan juga di
-`view/HyperCalDisplayView.findVerticalCursorTarget`, cabang baru untuk `PowerVisual` meniru cabang
-`FractionVisual` yang sudah ada — bedanya exponent digambar di ATAS base (bukan di bawah seperti
-denominator), jadi ▲ = base→exponent dan ▼ = exponent→base (kebalikan urutan fraction).
+**Up/down navigation (▲/▼):** also added in `view/HyperCalDisplayView.findVerticalCursorTarget`, a
+new branch for `PowerVisual` mirroring the existing `FractionVisual` branch — the difference is the
+exponent is drawn ABOVE the base (not below like the denominator), so ▲ = base→exponent and
+▼ = exponent→base (the reverse order of fractions).
 
-Diuji ulang di emulator: kotak exponent sekarang proporsional (screenshot dibandingkan sebelum/sesudah),
-◀/▶ dan ▲/▼ berhasil pindah base↔exponent untuk `x²` (base/exponent polos, 1 tekan per boundary) dan
-`xʸ` (base dibungkus kurung, 2 tekan untuk keluar base), plus regresi penuh pecahan/mixed/1x/sqrt/
-parenthesis/kombinasi bersarang — semua masih benar.
+Re-tested on the emulator: the exponent box is now proportional (compared before/after via
+screenshot), ◀/▶ and ▲/▼ successfully move between base↔exponent for `x²` (plain base/exponent, 1
+press per boundary) and `xʸ` (base wrapped in parentheses, 2 presses to exit the base), plus full
+regression of fractions/mixed/1x/sqrt/parenthesis/nested combinations — all still correct.
 
-## F. Bug lanjutan (2026-09-26): kursor nempel DI DALAM kotak, bukan di sebelah kotak
+## F. Follow-up bug (2026-09-26): cursor sticking INSIDE the box, not beside it
 
-User membandingkan lagi ke app asli: menggerakkan ◀/▶ seharusnya menempatkan kursor **di sebelah
-kiri/kanan kotak** (di luar kotak), bukan di dalam/menempel garis kotaknya. Kotak pecahan (`a/b`,
-lewat `EmptyNode`/`PlaceholderVisual`) sudah benar sejak awal — sudah pakai konvensi default
-`MathVisual.getCursorPosition` (index 0 → `-0.5×lebarKursor` yaitu SEBELAH KIRI kotak, else →
-`b.x + 0.5×lebarKursor` yaitu SEBELAH KANAN kotak). Tapi kotak-kotak baru yang lewat `NumberVisual`
-(exponent/base `xʸ`/`x²`/`x³`, isi `√`, isi `(...)`) **tidak** ikut konvensi ini — `NumberVisual.
-getCursorPosition` selalu override dengan rumus karakter-per-karakter, dan untuk teks kosong itu
-jatuh ke `return new PointF(0, m)` yaitu **x=0**, persis di tepi kiri DALAM kotak (karena kotak
-digambar mulai dari `insetX` yang kecil, x=0 nyaris menempel/overlap garis kotak), bukan di luar
-kotak seperti `PlaceholderVisual`.
+The user compared against the real app again: pressing ◀/▶ should place the cursor **beside the
+box** (outside it, left/right), not stuck inside/against its border. Fraction boxes (`a/b`, via
+`EmptyNode`/`PlaceholderVisual`) were already correct from the start — already using the default
+`MathVisual.getCursorPosition` convention (index 0 → `-0.5×cursorWidth`, i.e. to the LEFT of the
+box, else → `b.x + 0.5×cursorWidth`, i.e. to the RIGHT of the box). But the new boxes rendered via
+`NumberVisual` (exponent/base of `xʸ`/`x²`/`x³`, `√` content, `(...)` content) **didn't** follow this
+convention — `NumberVisual.getCursorPosition` always overrides with a per-character measurement
+formula, and for empty text that falls to `return new PointF(0, m)`, i.e. **x=0**, right at the left
+edge INSIDE the box (since the box is drawn starting from a small `insetX`, x=0 nearly touches/
+overlaps the box's border), not outside the box like `PlaceholderVisual`.
 
-**Perbaikan:** `NumberVisual.getCursorPosition` sekarang delegasi ke `super.getCursorPosition()`
-(default `MathVisual`, yang sama dipakai `PlaceholderVisual`) kalau teksnya kosong, dan baru pakai
-rumus pengukuran karakter kalau ada isinya. Sudah diuji ulang lewat screenshot (`√` dan `xʸ`): kursor
-sekarang jelas berada di luar sebelah kiri kotak, sama seperti kotak pecahan.
+**Fix:** `NumberVisual.getCursorPosition` now delegates to `super.getCursorPosition()` (the default
+`MathVisual`, the same one `PlaceholderVisual` uses) when the text is empty, and only uses the
+character-measurement formula when there's actual content. Re-verified via screenshots (`√` and
+`xʸ`): the cursor is now clearly outside, to the left of the box, same as fraction boxes.
 
-## G. Bug lanjutan (2026-09-26): ◀/▶ dari kotak exponent "macet", dan tap di kotak kosong
+## G. Follow-up bug (2026-09-26): ◀/▶ from the exponent box "stuck", and tapping an empty box
 
-User laporkan dua hal setelah Bagian F: (1) kalau kursor di sebelah kiri kotak exponent kosong,
-tekan ▶ tidak bisa pindah ke sebelah kanan kotak; (2) tap di dalam kotak kosong tidak bisa memilih
-posisi kiri/kanan sesuai lokasi tap. Dicek lagi ke kode asli via subagent:
+The user reported two things after Section F: (1) with the cursor to the left of an empty exponent
+box, pressing ▶ couldn't move to the right of the box; (2) tapping inside an empty box couldn't pick
+a left/right position based on tap location. Checked against the original code again via subagent:
 
-**G.1 (tap di kotak kosong) — TERNYATA SUDAH SESUAI KODE ASLI, BUKAN BUG.** `C0357yG.java:165-166`
-(`mo359HiPER`, method posisi-kursor-berdasar-index): kalau kotak kosong, method ini **selalu
-return `(0,0)` apa pun index-nya** — tidak ada percabangan berdasar index sama sekali. Dan
-`C0357yG.java` juga **tidak** override method hit-test (`AbstractC0335wD.HiPER(PointF,bool,bool)`)
-sama sekali — hit-test untuk QA 100% diwariskan dari base class, yang untuk leaf tanpa anak juga
-**tidak** melakukan split kiri/kanan berdasar tap-x (`AbstractC0335wD.java` ±baris 75-207: untuk
-leaf dengan 0 anak, langsung return satu hasil yang sama, tidak ada pengecekan `pointF.x` terhadap
-titik tengah). Kesimpulan: **di kode asli, tap di mana pun di dalam kotak kosong memang selalu
-menghasilkan kursor di posisi yang sama** — tidak ada perbedaan kiri/kanan untuk kotak kosong. Kode
-kita (`PlaceholderVisual.hitTest` & `NumberVisual.hitTest` untuk teks kosong, keduanya
-`return CursorPointer(node, 0)` tanpa syarat) sudah **persis sama** dengan perilaku asli ini. Tidak
-ada perubahan kode untuk poin ini.
+**G.1 (tapping an empty box) — TURNS OUT THIS ALREADY MATCHES THE ORIGINAL CODE, NOT A BUG.**
+`C0357yG.java:165-166` (`mo359HiPER`, the position-by-index method): for an empty box, this method
+**always returns `(0,0)` regardless of index** — there's no branching by index at all. And
+`C0357yG.java` also **doesn't** override the hit-test method (`AbstractC0335wD.HiPER(PointF,
+bool,bool)`) at all — hit-test for QA is 100% inherited from the base class, which for a leaf with
+no children also **doesn't** split left/right based on tap-x (`AbstractC0335wD.java` ±lines 75-207:
+for a leaf with 0 children, it directly returns one single result, with no check of `pointF.x`
+against the midpoint). Conclusion: **in the original code, tapping anywhere inside an empty box
+always produces the cursor at the same position** — there's no left/right distinction for an empty
+box. Our code (`PlaceholderVisual.hitTest` & `NumberVisual.hitTest` for empty text, both
+unconditionally `return CursorPointer(node, 0)`) already matches this original behavior
+**exactly**. No code changes for this point.
 
-**G.2 (◀/▶ macet di exponent) — INI BUG BENERAN, sudah diperbaiki.** Root cause: `PowerVisual.
-getCursorPosition(index)` kita yang lama **mendelegasikan** index==1 ("Center setelah power") ke
-`exponentVisual.getCursorPosition(0)` — yaitu SELALU ke posisi awal exponent, bukan ke tepi kanan
-seluruh power. Dicek ke `C0311tf.java` (asli): file ini **tidak override `mo359HiPER(int)` sama
-sekali** — jadi index 0/1 pada node power sendiri (bukan pada exponent-nya) murni pakai rumus
-default `AbstractC0335wD.mo359HiPER` (±baris 744-765): index 0 → tepi kiri (`-0.5×lebarKursor`),
-index 1 → tepi kanan **pakai lebar node power itu sendiri** (`0.5×lebarKursor + this.b.x`) — TIDAK
-pernah delegasi ke child manapun. Jadi arsitektur asli: "Center setelah power" seharusnya muncul di
-ujung KANAN seluruh ekspresi `x^y`, bukan di awal kotak exponent — persis seperti pola `Fraction`/
-`PlaceholderVisual` yang sudah dipakai di tempat lain (tidak override, andalkan default `MathVisual`).
+**G.2 (◀/▶ stuck in the exponent) — THIS IS A REAL BUG, now fixed.** Root cause: our old
+`PowerVisual.getCursorPosition(index)` **delegated** index==1 ("Center after the power") to
+`exponentVisual.getCursorPosition(0)` — i.e. ALWAYS to the start of the exponent, not the right edge
+of the whole power. Checked against `C0311tf.java` (the original): this file **doesn't override
+`mo359HiPER(int)` at all** — so index 0/1 on the power node itself (not on its exponent) purely uses
+the default formula `AbstractC0335wD.mo359HiPER` (±lines 744-765): index 0 → left edge
+(`-0.5×cursorWidth`), index 1 → right edge **using the power node's own width**
+(`0.5×cursorWidth + this.b.x`) — NEVER delegating to any child. So the original architecture:
+"Center after the power" should appear at the RIGHT edge of the entire `x^y` expression, not at the
+start of the exponent box — exactly the same pattern as `Fraction`/`PlaceholderVisual` used
+elsewhere (don't override, rely on `MathVisual`'s default).
 
-**Perbaikan:** override `getCursorPosition` di `PowerVisual` dihapus total, kembali pakai default
-`MathVisual` (paralel dengan cara `PlaceholderVisual` sudah tidak override method ini sejak awal
-sesi). Efek samping baik: ini juga memperbaiki isu serupa yang belum sempat dilaporkan untuk `x²`/
-`x³` — sebelumnya kursor "setelah `x²`" (buat lanjut ngetik) muncul salah di awal superscript "2",
-sekarang muncul benar di ujung kanan seluruh `x²`. Diuji ulang: screenshot sebelum/sesudah ▶ dari
-kotak exponent kosong (sekarang jelas pindah ke ujung kanan seluruh ekspresi), plus lanjut ngetik
-setelah `x²` (`5` → x² → `+` → `9` → `5^{2} + 9`, bukan salah sisip di tengah), dan regresi penuh.
+**Fix:** removed the `getCursorPosition` override in `PowerVisual` entirely, back to the
+`MathVisual` default (paralleling how `PlaceholderVisual` never overrode this method from the
+start). Good side effect: this also fixed a similar unreported issue for `x²`/`x³` — the cursor
+"after `x²`" (to continue typing) used to incorrectly appear at the start of the superscript "2",
+now correctly appears at the right edge of the whole `x²`. Re-tested: before/after screenshots of ▶
+from an empty exponent box (now clearly moves to the right edge of the whole expression), plus
+continuing to type after `x²` (`5` → x² → `+` → `9` → `5^{2} + 9`, not incorrectly inserted in the
+middle), and full regression.
 
-## H. Bug lanjutan (2026-09-26): tap di kanvas jauh di kanan kotak tetap mendarat di kiri kotak
+## H. Follow-up bug (2026-09-26): tapping the canvas far to the right of the box still lands on the left of the box
 
-Setelah Bagian G, user masih lapor: klik di display (bukan tombol panah) untuk pindah ke kanan kotak
-tetap tidak jalan. Dites langsung di emulator (bukan cuma baca kode): tap di kotak exponent kosong
-sendiri sudah benar (selalu ke posisi yang sama — cocok Bagian G.1, faithful). Tapi tap **jauh di
-kanan seluruh ekspresi `(5)^{}`** (di kanvas kosong, bukan di kotaknya) **juga** mendarat di kiri
-kotak exponent, tidak masuk akal — seharusnya minimal mendarat di "Center setelah power" (ujung
-kanan seluruh ekspresi), sama seperti perilaku `FractionVisual` untuk tap di luar batas kontennya.
+After Section G, the user still reported: tapping the display (not the arrow buttons) to move to
+the right of the box still didn't work. Tested directly on the emulator (not just reading code):
+tapping the empty exponent box itself already worked correctly (always the same position — matches
+G.1, faithful). But tapping **far to the right of the whole expression `(5)^{}`** (on empty canvas,
+not on the box itself) **also** landed on the left of the exponent box, which makes no sense — it
+should at minimum land at "Center after the power" (the right edge of the whole expression), same as
+`FractionVisual`'s behavior for taps outside its content bounds.
 
-**Root cause:** `PowerVisual.hitTest` tidak punya pengecekan batas (`activeLeft`/`activeRight`)
-seperti `FractionVisual` — method itu cuma cek `point.x >= exponentVisual.HiPER.x` TANPA batas atas,
-jadi tap berapa pun jauhnya ke kanan tetap dianggap "masuk exponent", lalu exponent yang kosong
-selalu balikin posisi yang sama (kiri kotak) — makanya kelihatan seperti tidak bisa pindah ke kanan.
+**Root cause:** `PowerVisual.hitTest` had no boundary check (`activeLeft`/`activeRight`) like
+`FractionVisual` does — the method just checked `point.x >= exponentVisual.HiPER.x` with NO upper
+bound, so a tap any distance to the right was still considered "inside the exponent," and the empty
+exponent always returns the same position (left of the box) — which is why it looked like it
+couldn't move to the right.
 
-**Perbaikan:** tambahkan pengecekan `activeLeft`/`activeRight` di awal `PowerVisual.hitTest`, persis
-pola `FractionVisual` (Bagian 7 `btn_fraction.md`) — tap di luar batas gabungan base+exponent balik
-`CursorPointer(pow, 0)` (sebelum) atau `CursorPointer(pow, 1)` (sesudah), baru kalau di dalam batas
-diteruskan ke base/exponent seperti sebelumnya. Diuji ulang: tap di kanvas kosong jauh di kanan
-`(5)^{}` sekarang benar mendarat di ujung kanan seluruh ekspresi (bukan lagi nyangkut di kiri kotak
-exponent); tap di dalam kotak exponent sendiri tetap konsisten (posisi tunggal, sesuai Bagian G.1);
-regresi penuh masih benar.
+**Fix:** added an `activeLeft`/`activeRight` check at the start of `PowerVisual.hitTest`, exactly
+matching `FractionVisual`'s pattern (Section 7 of `btn_fraction.md`) — a tap outside the combined
+base+exponent bounds returns `CursorPointer(pow, 0)` (before) or `CursorPointer(pow, 1)` (after),
+and only when inside the bounds does it forward to base/exponent as before. Re-tested: tapping empty
+canvas far to the right of `(5)^{}` now correctly lands at the right edge of the whole expression
+(no longer stuck on the left of the exponent box); tapping inside the exponent box itself remains
+consistent (single position, per G.1); full regression still correct.
 
-## I. Perubahan (2026-09-26): "()" dihapus sebagai node beneran, jadi dekorasi render saja
+## I. Change (2026-09-26): "()" removed as a real node, now purely render decoration
 
-Setelah Bagian C–H, user cek ulang ke app asli dan sadar: `()` di sekitar base `xʸ` itu **dummy** —
-bukan tanda kurung beneran yang bisa dinavigasi terpisah (seperti tombol `(` `)` asli). Disepakati
-untuk dihapus dari model sebagai `ParenthesisNode`, diganti murni dekorasi render, memakai mekanisme
-yang sudah ada di kode: `PowerNode.needsParenthesesForBase()` (awalnya cuma dipakai `toLatexString`,
-sekarang juga dipakai render kanvas) — ditambah kondisi baru: `"xʸ".equals(operationName)` selalu
-`true` (base `xʸ` selalu berkurung apa pun isinya, beda dari kondisi lain yang cuma untuk kasus
-angka negatif/ekspresi majemuk). `x²`/`x³`/`x⁻¹` tidak terpengaruh (operationName-nya bukan "xʸ").
+After Sections C–H, the user re-checked against the real app and realized: the `()` around the xʸ
+base is **fake** — not real navigable parentheses (like the actual `(` `)` buttons). Agreed to
+remove it from the model as a `ParenthesisNode`, replacing it with pure render decoration, using a
+mechanism that already existed in the code: `PowerNode.needsParenthesesForBase()` (originally only
+used by `toLatexString`, now also used for canvas rendering) — plus a new condition:
+`"xʸ".equals(operationName)` always returns `true` (the xʸ base is always parenthesized regardless
+of content, unlike the other conditions which only apply to cases like negative numbers or compound
+expressions). `x²`/`x³`/`x⁻¹` are unaffected (their `operationName` isn't "xʸ").
 
-**Perubahan kode:**
-- `ExpressionEditor.insertPower()` sekarang delegasi penuh ke `insertPowerNode("", "xʸ", true)` —
-  tidak ada lagi cabang lift/`ParenthesisNode` terpisah. Base jadi operand polos, sama seperti
+**Code changes:**
+- `ExpressionEditor.insertPower()` now delegates entirely to `insertPowerNode("", "xʸ", true)` —
+  no more separate lift/`ParenthesisNode` branch. The base is now a plain operand, same as
   x²/x³/x⁻¹.
-- `render/PowerVisual.java`: `calculateLayout` menghitung `parenW` (lebar dekorasi kurung, formula
-  sama seperti `ParenthesisVisual`) saat `needsParenthesesForBase()` true, menggeser posisi base ke
-  kanan sejauh `parenW` dan menambah lebar total. `draw` menggambar arc kurung kiri/kanan di sekitar
-  base (formula arc sama persis `ParenthesisVisual`) sebelum menggambar base itu sendiri.
-- Efek samping baik: navigasi ◀/▶ antara base dan exponent `xʸ` sekarang **1 kali tekan** (bukan 2×
-  seperti sebelumnya saat base beneran dibungkus `ParenthesisNode`) — lebih sederhana & konsisten
-  dengan `x²`/`x³`.
+- `render/PowerVisual.java`: `calculateLayout` computes `parenW` (the parenthesis decoration
+  width, same formula as `ParenthesisVisual`) when `needsParenthesesForBase()` is true, shifting the
+  base's position right by `parenW` and adding to the total width. `draw` draws the left/right
+  parenthesis arcs around the base (same arc formula as `ParenthesisVisual`) before drawing the base
+  itself.
+- Good side effect: ◀/▶ navigation between base and exponent for xʸ is now **1 press** (instead of
+  2× as before when the base was really wrapped in a `ParenthesisNode`) — simpler & consistent with
+  `x²`/`x³`.
 
-**Bug serius yang ketemu di jalan (dan diperbaiki bersamaan):** `insertPowerNode` (helper dipakai
-x²/x³/x⁻¹, dan sekarang xʸ juga) ternyata **crash `StackOverflowError`** kalau dipanggil pada
-ekspresi yang benar-benar kosong (`cursorPointer.node` adalah `rootSequence` itu sendiri, bukan
-token). Constructor `PowerNode` meng-assign ulang parent dari `targetBase` (di sini `rootSequence`)
-ke `PowerNode` yang baru dibuat, lalu `PowerNode` itu ditambahkan sebagai child dari `rootSequence`
-yang SAMA — jadi `rootSequence` jadi anak dari anaknya sendiri (siklus), bikin `toLatexString`
-rekursi tak terhingga. Bug ini sudah ada dari awal `insertPowerNode` dibuat, tapi baru ketahuan
-sekarang karena sebelumnya x²/x³/xʸ selalu dites setelah ngetik angka dulu ("5" lalu x²), tidak
-pernah dites di keadaan benar-benar kosong. Diperbaiki: `insertPowerNode` sekarang cek eksplisit
-`cursorPointer.node instanceof SequenceNode` (dan node terakhir di root kalau itu juga
-`SequenceNode`) → treat sebagai "tidak ada yang bisa diangkat", pakai `insertAtCursor` dengan base
-kosong baru (bukan `rootSequence` itu sendiri), kursor ke base. Diuji ulang: `x²`, `x³`, `xʸ` semua
-langsung dari keadaan kosong (tanpa ngetik apa pun dulu) — tidak crash lagi, kursor mendarat wajar
-di kotak base kosong.
+**A serious bug found along the way (and fixed at the same time):** `insertPowerNode` (the helper
+used by x²/x³/x⁻¹, and now also xʸ) turned out to **crash with a `StackOverflowError`** when called
+on a truly empty expression (`cursorPointer.node` is `rootSequence` itself, not a token). The
+`PowerNode` constructor reassigns the parent of `targetBase` (here, `rootSequence`) to the newly
+created `PowerNode`, and that `PowerNode` then gets added as a child of the SAME `rootSequence` —
+so `rootSequence` becomes a child of its own child (a cycle), causing infinite recursion in
+`toLatexString`. This bug existed since `insertPowerNode` was first created, but only surfaced now
+because x²/x³/xʸ were always previously tested after typing a number first ("5" then x²), never on a
+truly empty state. Fixed: `insertPowerNode` now explicitly checks
+`cursorPointer.node instanceof SequenceNode` (and the last node in root if that's also a
+`SequenceNode`) → treats it as "nothing to lift," uses `insertAtCursor` with a fresh empty base
+(not `rootSequence` itself), cursor to the base. Re-tested: `x²`, `x³`, `xʸ` all starting from an
+empty state (without typing anything first) — no more crash, cursor lands correctly in the empty
+base box.
 
-## J. Perubahan (2026-09-26): "()" dihapus total dari tampilan `xʸ`
+## J. Change (2026-09-26): "()" removed entirely from xʸ's display
 
-Setelah Bagian I (kurung jadi dekorasi render, bukan node), user minta lebih jauh: jangan tampilkan
-`()` sama sekali untuk `xʸ`. Dibatalkan kondisi `"xʸ".equals(operationName)` yang barusan ditambahkan
-di `PowerNode.needsParenthesesForBase()` — method ini balik ke logika aslinya (kurung otomatis hanya
-untuk kasus yang memang butuh secara matematis: basis negatif, ekspresi majemuk, operator), yang juga
-dipakai bersama oleh x²/x³/x⁻¹/xʸ tanpa perbedaan lagi. Mekanisme render dekorasi di `PowerVisual`
-(Bagian I) tidak diubah — otomatis berhenti menggambar kurung karena `needsParenthesesForBase()`
-sekarang mengembalikan `false` untuk base kosong/angka biasa seperti sebelumnya. Diuji ulang: `xʸ`
-kosong sekarang `^{}` (bukan `()^{}`), `5` → `xʸ` → `3` sekarang `5^{3}` (bukan `(5)^{3}`); x²/x³/
-pecahan/1x/kombinasi masih benar semua.
+After Section I (the parentheses became render decoration, not a node), the user asked to go
+further: don't show `()` at all for `xʸ`. Reverted the `"xʸ".equals(operationName)` condition just
+added to `PowerNode.needsParenthesesForBase()` — this method returns to its original logic
+(automatic parentheses only for cases that genuinely need them mathematically: negative base,
+compound expression, operator), which is now shared identically by x²/x³/x⁻¹/xʸ with no distinction.
+The render decoration mechanism in `PowerVisual` (Section I) was left unchanged — it now
+automatically stops drawing parentheses because `needsParenthesesForBase()` returns `false` for an
+empty base/plain number, as before. Re-tested: an empty `xʸ` is now `^{}` (not `()^{}`), `5` → `xʸ`
+→ `3` is now `5^{3}` (not `(5)^{3}`); x²/x³/fractions/1x/combinations all still correct.
