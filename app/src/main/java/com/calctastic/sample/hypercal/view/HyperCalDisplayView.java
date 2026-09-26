@@ -355,6 +355,22 @@ public class HyperCalDisplayView extends View {
                     float localX = Math.max(0.0f, Math.min(cx - slot.HiPER.x, slot.b.x));
                     return slot.hitTest(new PointF(localX, slot.b.y / 2.0f), textPaint);
                 }
+            } else if (parent instanceof com.calctastic.sample.hypercal.render.PowerVisual) {
+                // Exponent sits visually above the base, so ▲ goes base->exponent and ▼ the
+                // reverse -- same "only cross the boundary you're not already past" rule as
+                // fraction's numerator/denominator above.
+                com.calctastic.sample.hypercal.render.PowerVisual pow =
+                        (com.calctastic.sample.hypercal.render.PowerVisual) parent;
+                boolean inExponent = curr == pow.exponentVisual;
+                if (down == inExponent) {
+                    MathVisual slot = down ? pow.baseVisual : pow.exponentVisual;
+                    if (slot == null) {
+                        return null;
+                    }
+                    float cx = Math.max(margin + 1.0f, Math.min(x, (pow.b.x - margin) - 1.0f));
+                    float localX = Math.max(0.0f, Math.min(cx - slot.HiPER.x, slot.b.x));
+                    return slot.hitTest(new PointF(localX, slot.b.y / 2.0f), textPaint);
+                }
             }
             curr = parent;
         }

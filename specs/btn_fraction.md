@@ -260,3 +260,66 @@ Semua task yang bisa dikerjakan di lingkungan ini sudah selesai. Yang tersisa:
 ### F. Tombol "a b/c" (Mixed Number)
 
 Dipisah ke file sendiri (2026-09-26): **`specs/btn_ab_c.md`** — supaya spec di folder ini per-tombol (satu file = satu tombol keypad), bukan menumpuk semua varian pecahan di satu file.
+
+### G. TODO lintas-tombol: kotak kosong bisa digerakkan kiri/kanan
+
+Dipindah ke file terpisah (2026-09-26): **`specs/box_cursor_lr.md`** — ini bukan isu spesifik
+tombol a/b, tapi berlaku untuk semua jenis kotak kosong (pecahan, `xʸ`, `√`, `(...)`), jadi tidak
+cocok ditaruh di spec per-tombol.
+
+### H. Pemindahan Lokasi Kode (2026-09-26): `ExpressionEditor.java` dipecah lagi (730 baris)
+
+`ExpressionEditor.java` sudah dipecah sekali dari `HyperCalActivity.java` (Bagian E), tapi terus
+tumbuh sampai 730 baris seiring bertambahnya tombol (`a b/c`, `1/x`, `xʸ`/`x²`/`x³`/`x⁻¹`). Dipecah
+lagi jadi per-keluarga tombol, bukan per-tombol (helper yang dipakai bersama antar tombol satu
+keluarga terlalu banyak untuk dipisah per-tombol tanpa duplikasi):
+
+- **`engine/CursorNav.java`** (baru) — semua helper navigasi/slot murni & statis yang dipakai
+  bersama: `fractionOfSlot`, `afterNode`, `startOf`/`endOf`, `enterFromLeft`, `startOfNode`/
+  `endOfNode`, `hasOperandBeforeCursor`, `insertAtCursor`. Dipakai oleh `ExpressionEditor` sendiri
+  (DEL, navigasi kiri/kanan) DAN oleh class inserter di bawah ini.
+- **`engine/inserter/FractionInserter.java`** (baru) — `insertFraction`, `insertMixedFraction`,
+  `insertReciprocal` (tombol a/b, a b/c, 1/x — lihat `btn_ab_c.md`, `btn_1_per_x.md`).
+- **`engine/inserter/PowerInserter.java`** (baru) — `insertPower`, `insertSquare`, `insertCube`,
+  `insertNegativeOnePower` + helper privat `insertPowerNode` (tombol xʸ, x², x³, x⁻¹ — lihat
+  `btn_x_power_y.md`, `btn_x_square.md`).
+- **`ExpressionEditor.java`** (waktu itu tersisa 469 baris) — delegasi ke dua class inserter di
+  atas, plus tombol simpel, DEL, dan navigasi kiri/kanan.
+
+Metode inserter di `FractionInserter`/`PowerInserter` bersifat `static`, menerima
+`rootSequence`/`cursorPointer` sebagai parameter eksplisit (bukan state instance), dan
+mengembalikan `CursorPointer` baru — `ExpressionEditor` yang memanggil lalu menyimpan hasilnya
+lewat `setCursor(...)`. Tidak ada perubahan perilaku sama sekali; diuji ulang penuh: semua tombol
+pecahan/power, DEL/unwrap, navigasi operator (`specs/operator_cursor_nav.md`), dan kombinasi
+bersarang — semua identik dengan sebelum pemecahan.
+
+**Lanjutan pemecahan (2026-09-26, hari yang sama):** user bertanya apakah DEL dan navigasi
+kiri/kanan juga sebaiknya dipisah. Dicek dulu: keduanya ternyata **tidak pernah menyentuh
+`rootSequence` sama sekali** — murni jalan-jalan di tree lewat `node.getParent()` — jadi bisa
+diekstrak jadi method statis murni (fungsi dari `CursorPointer` saja), sama seperti helper
+`CursorNav` yang sudah ada, bukan cuma method privat `ExpressionEditor`. Dipecah lebih lanjut:
+
+- **`moveCursorLeft`/`moveCursorRight`** dipindah **ke dalam `CursorNav.java`** (bukan file baru)
+  sebagai `CursorNav.moveLeft(CursorPointer)`/`CursorNav.moveRight(CursorPointer)` — bukan "fitur
+  satu tombol" seperti insert, tapi justru pintu masuk level-atas untuk helper-helper level-bawah
+  yang sudah ada di `CursorNav` (`afterNode`, `startOf`/`endOf`, `enterFromLeft`, dst.), jadi lebih
+  masuk akal digabung satu file daripada dipisah lagi.
+- **`engine/CursorDelete.java`** (baru) — `deleteChar` + helper privatnya (`deleteBefore`,
+  `removeFromSequence`, `unwrapFraction`). Ini unit yang cukup besar & berdiri sendiri (~180 baris,
+  termasuk logika unwrap/nesting Task 19/20b), beda dari navigasi murni, jadi dapat file sendiri
+  meniru pola `FractionInserter`/`PowerInserter`: method statis, terima `CursorPointer`, kembalikan
+  `CursorPointer` baru (bukan `null` untuk "tidak berubah" — tetap kembalikan cursor lama yang
+  sama, supaya pemanggil bisa selalu `setCursor(CursorDelete.deleteChar(cursorPointer))` tanpa
+  perlu null-check).
+- **`ExpressionEditor.java`** (sekarang 146 baris) — murni pemegang state (`rootSequence` +
+  `cursorPointer`) + tombol satu-baris yang tidak perlu file sendiri (`appendDigit`,
+  `toggleNegate`, `appendOperator`, `insertSqrt`, `insertParenthesis`) + delegasi ke semua class
+  di atas.
+
+Diuji ulang penuh lagi setelah pemecahan kedua ini (regresi pecahan/mixed/1x/power/sqrt/paren/DEL
+unwrap/navigasi operator/kombinasi bersarang, termasuk verifikasi screenshot per-langkah untuk bug
+navigasi operator) — semua identik, tidak ada perubahan perilaku.
+
+**Kalau mencari kode terkait sekarang:** tombol pecahan/power ada di `engine/inserter/`; navigasi
+◀/▶ (dan helper slot bersama) ada di `engine/CursorNav.java`; DEL/backspace ada di
+`engine/CursorDelete.java`; `ExpressionEditor.java` cuma orkestrasi tipis.
