@@ -51,10 +51,13 @@ public class PlaceholderVisual extends MathVisual {
         float insetX = 0.15f * measure0;
         float strokeWidth = measure0 * 0.1f;
 
+        // Color: AbstractC0335wD.HiPER(Paint, String) (used by C0357yG for this box) returns the
+        // paint UNCHANGED when the theme has no entry for the highlight key it looks up, which is
+        // the normal (non-highlighted) case here — so the box outline is the same color as the
+        // surrounding text, not a separate hardcoded tint.
         Paint boxPaint = new Paint(paint);
         boxPaint.setStyle(Paint.Style.STROKE);
         boxPaint.setStrokeWidth(strokeWidth);
-        boxPaint.setColor(0x80FFFFFF); // Semi-transparent secondary outline matching HiPER theme
 
         canvas.drawRect(insetX, 0.0f, b.x - insetX, b.y, boxPaint);
     }

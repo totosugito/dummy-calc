@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        HyperCal display colors.
+
+        HiPER Calc paints text/bar/placeholder with a single theme-keyed paint
+        (AbstractC0335wD.HiPER(Paint, String), android.core theme "86"): when the
+        highlight key it looks up isn't present in the theme map, it returns the
+        paint UNCHANGED, so the fraction bar and the empty placeholder box are the
+        same color as ordinary digits by default (not a separate secondary tint).
+        The cursor uses its own dedicated paint (UF.k(Canvas)); this sample aligns
+        it with the app's shared accent color, matching the sibling
+        CalctasticCalculatorActivity cursor (Color.parseColor("#FF9800")).
+    -->
+    <color name="hypercal_text">#FFFFFFFF</color>
+    <color name="hypercal_cursor">#FFFF9800</color>
+</resources>

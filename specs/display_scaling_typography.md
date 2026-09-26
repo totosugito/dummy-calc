@@ -111,7 +111,8 @@ $$\text{screenScale} = \text{mo352HiPER}() = \mathbf{Tg.HiPER(V.HiPER)}$$
   - **Implementasi:** `HyperCalDisplayView.updatePaintSize()` memakai ukuran `android.R.id.content`. Di ponsel tinggi, batas `1.2 × f` yang menentukan, jadi M hampir tidak berpengaruh.
   - **Hasil emulator 1080×2424 @420dpi:** `1.2 × 1080/266 × 14 ≈ 68.2 px` (sebelumnya 54.8 px). Klaim "88–92 px" di Bagian 3 tidak sesuai kode asli.
   - Asumsi yang belum terbukti: kelas keypad aktif adalah `C0341wd` (bukan `BD`/`C0081Pe`/`C0271pD`), cabang `Tk.xa = false`, dan mode bukan `EnumC0051Ha.c`.
-- [ ] **Task 8: Paint per visual via `k$1()`**: typeface + style dari `C0215jD`, warna dari tema key `"86"`. Hilangkan hardcode `0xFFFFFFFF` (teks) & `0xFF2196F3` (kursor).
+- [x] **Task 8: Paint per visual via `k$1()`**: typeface + style dari `C0215jD`, warna dari tema key `"86"`. Hilangkan hardcode `0xFFFFFFFF` (teks) & `0xFF2196F3` (kursor).
+  - Selesai sebagian: warna teks & kursor sekarang dari `res/values/colors.xml` (bukan literal di kode), kursor diselaraskan ke aksen aplikasi `#FF9800` (sama dengan `CalctasticCalculatorActivity`). Paint per-visual individual (`k$1()` dengan typeface/style per node dari tema `"86"`) belum diimplementasikan — semua visual masih berbagi satu `basePaint` yang diteruskan turun.
 - [x] **Task 9: Hapus clamp lebar kursor** `Math.max(3.0f, …)` / `Math.max(2.0f, …)` — dihapus di `HyperCalDisplayView` (fallback root cursor) dan `render/MathVisual.getCursorWidth` (dipakai semua visual).
 - [ ] **Task 10: Scroll, clip & wrap multi-baris** (`UF.java` baris 436–440, 638): `canvas.clipRect` dengan offset `B`, batas lebar `G.m` untuk wrap.
 - [x] **Task 11: Bersihkan Javadoc usang** di `HyperCalDisplayView` (masih menyebut `22sp`, `R.font.math_symbols`).

@@ -150,16 +150,19 @@ public class HyperCalDisplayView extends View {
 
     private void init() {
         textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        textPaint.setColor(0xFFFFFFFF);
+        // Theme color from res/values/colors.xml instead of a hardcoded literal, so the
+        // display follows the app theme (HiPER: AbstractC0335wD.HiPER(Paint, String) theme "86").
+        textPaint.setColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.hypercal_text));
 
         // HiPER Calc AbstractC0293re.java line 135: DC.HiPER("\\\u0014t\u0007q") -> "Arial"
         textPaint.setTypeface(Typeface.create("Arial", Typeface.NORMAL));
 
         updatePaintSize();
 
-        // Cursor paint matching HiPER UF.k(Canvas): Style.FILL
+        // Cursor paint matching HiPER UF.k(Canvas): Style.FILL. Aligned with the app's shared
+        // accent color (see colors.xml) rather than an unrelated hardcoded blue.
         cursorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        cursorPaint.setColor(0xFF2196F3); // HiPER Cyan/Blue accent cursor
+        cursorPaint.setColor(androidx.core.content.ContextCompat.getColor(getContext(), R.color.hypercal_cursor));
         cursorPaint.setStyle(Paint.Style.FILL);
 
         // Initial default expression

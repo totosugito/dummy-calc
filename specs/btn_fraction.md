@@ -193,6 +193,7 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
 
 ### B. Belum Dikerjakan
 - [ ] **Task 10: Mode linear `a/b`** (`Qg.a`, `Qg.java` baris 96–126): render sebaris dengan `'/'`, anak tidak diskala 0.8, baseline `max(numM, -ascent, denM)`.
+  - **STATUS: DINONAKTIFKAN / DITUNDA** atas permintaan user (2026-09-26). Belum ada rencana pengerjaan; jangan diimplementasikan sampai ada instruksi eksplisit. Alasan pemicu di HiPER (`Qg.a`, layar sempit atau mode linear aktif dari pengaturan) belum ditentukan skenarionya untuk sample app ini.
 - [x] **Task 11: Padding nested fraction `m$3()`**
   - `FractionVisual.calculateLayout`: `m3 = spaceWidth × 1.0f` bila pembilang/penyebut adalah `FractionVisual` lagi, else 0. `numX`/`denX` digeser `+m3`, `b.x = maxW + 2×m3`.
   - Garis pecahan tetap digambar `0..b.x` — karena pembilang/penyebut sudah digeser `+m3`, versi asli `fMin - m$3()` otomatis kembali ke 0 dan `F()` (perkiraan `b.x`) mencakup padding baru, jadi rumusnya sama saja secara efektif.
@@ -203,7 +204,12 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
   - `PlaceholderVisual`: `m = -ascent + 0.9 × density`, `b.y = descent + m`. Kotak digambar dari `y=0` sampai `y=b.y` (versi kita tidak mengimplementasikan padding vertikal `L` milik `AbstractC0335wD`, jadi `fB` disederhanakan jadi 0 — ini simplifikasi yang disengaja, bukan berdasarkan kode).
   - Rumus lama (`textSize × 0.9`, kotak berpusat di `m ± ascent×0.9`) sudah tidak dipakai.
 - [ ] **Task 14: Mode placeholder tersembunyi `C0357yG.E()` / `QA.B()` / `QA.D()`**: tidak digambar, lebar ±cursorWidth, kursor di (0,0). Plus mode elipsis `"…"` (`qa.b()`) dan label argumen `L()`.
-- [ ] **Task 15: Warna garis & kotak** memakai warna tema `HiPER(paint, strHiPER)`, bukan `#80FFFFFF` hardcode.
+- [x] **Task 15: Warna garis & kotak memakai warna tema, bukan hardcode**
+  - **Temuan:** `AbstractC0335wD.HiPER(Paint, String)` (dipakai `C0357yG` untuk kotak placeholder) mengembalikan paint **apa adanya** kalau key highlight yang dicari tidak ada di map tema — yaitu kondisi normal (tidak sedang di-highlight). Jadi kotak placeholder dan garis pecahan **memakai warna teks biasa**, bukan warna sekunder/transparan terpisah seperti asumsi lama (`#80FFFFFF`).
+  - `PlaceholderVisual`: kotak sekarang mewarisi warna dari `basePaint` (sama seperti teks), tidak ada `setColor` terpisah.
+  - `FractionVisual`: garis pecahan sudah mewarisi warna sejak awal (tidak berubah).
+  - `HyperCalDisplayView`: warna teks & kursor dipindah ke `res/values/colors.xml` (`hypercal_text`, `hypercal_cursor`) supaya ikut tema aplikasi, bukan literal hex di kode. Kursor diselaraskan ke warna aksen aplikasi (`#FF9800`, sama dengan kursor `CalctasticCalculatorActivity`) menggantikan biru yang tidak berhubungan.
+  - Uji emulator: kursor tampil oranye (menyatu dengan tombol `=`), kotak placeholder putih solid seperti teks.
 - [x] **Task 16: Hapus clamp `Math.max(1.5f, …)`** pada gap, tebal garis (`FractionVisual`), dan stroke placeholder (`PlaceholderVisual`). Clamp lebar kursor `Math.max(3.0f/2.0f, …)` di `MathVisual.getCursorWidth` dan `HyperCalDisplayView` juga dihapus (menyatu dengan Display Task 9).
 - [x] **Task 17: Geometri kursor `mo359/mo360`**
   - `MathVisual.getCursorRect` (default) sekarang persis rumus dasar `AbstractC0335wD`: tinggi penuh `0..b.y`, lebar berpusat di `getCursorPosition(index).x`.
@@ -225,5 +231,5 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
 1. ~~**Perilaku (langsung terasa pengguna):** Task 20 → Task 19 → Task 12 → verifikasi tap kiri/kanan pecahan (sisa Task 5).~~ ✅ selesai 2026-09-26
 2. ~~**Skala display:** `display_scaling_typography.md` Task 7.~~ ✅ selesai 2026-09-26
 3. ~~**Akurasi render:** Task 13 → Task 17 → Task 11 → Task 16 (+ display Task 9).~~ ✅ selesai 2026-09-26
-4. **Warna tema:** Task 15 (+ display Task 8).
+4. ~~**Warna tema:** Task 15 (+ display Task 8).~~ ✅ selesai 2026-09-26
 5. **Fitur tambahan:** Task 10 → Task 14 (+ display Task 10).
