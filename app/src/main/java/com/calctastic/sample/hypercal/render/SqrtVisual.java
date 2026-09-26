@@ -4,158 +4,166 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
+import com.calctastic.sample.hypercal.engine.model.CursorPointer;
 import com.calctastic.sample.hypercal.engine.model.SqrtNode;
 
 /**
  * Radical / Square Root (and n-th root) visual renderer.
  *
- * The 5-point polygonal outline + perpendicular-normal thickness expansion + miter joints below
- * still follow the general SHAPE of HiPER Calc's android.core.C0102Vh.java, but the specific
- * proportions (tick width, margins, thickness) are NOT a literal port -- C0102Vh's own draw
- * method mixes in a same-named zero-arg method that returns a float in one call site
- * (`k() * 0.9f`) and an AbstractC0335wD (a child visual) in another (`AbstractC0335wD
- * abstractC0335wDK = k();`), which cannot both be the same method; the decompiler has collapsed
- * two distinct obfuscated methods onto one name. Rather than guess which original formula that
- * first call was actually part of, this class uses its own proportions, chosen to look like a
- * normal, uncluttered radical sign and scale sensibly with content height instead of a fixed
- * font-size fraction (which produced a too-wide gap before the tick and an oversized vinculum
- * overshoot at small sizes -- found 2026-09-26 while adding n-th-root support, see
- * specs/btn_sqrt.md).
+ * A faithful port of HiPER Calc's android.core.C0102Vh's actual TECHNIQUE, confirmed from its
+ * decompiled draw method to be manual vector drawing -- NOT a font glyph (there is no
+ * `drawText("√", ...)` anywhere in it): it builds a 5-point outline, expands each segment into a
+ * filled quad strip using the perpendicular of its own direction vector, adds a small filled
+ * triangle at each interior joint (a manual miter join), and fills the resulting `Path` with
+ * `Path.FillType.WINDING`. That whole technique -- point-list, perpendicular-normal thickness
+ * expansion, per-joint triangle fill -- is copied here exactly, including reusing `addPolygonToPath`
+ * (renamed from C0102Vh's own `HiPER(Path, float[], float[])`) unchanged.
  *
- * calculateLayout() stores the exact geometry (tick/vinculum position and size) it computes as
- * instance fields, and draw() reuses those fields directly instead of recomputing its own
- * (slightly different) copies of the same formulas -- the previous version computed fTickWidth/
- * fBottomY/fTopY independently in both methods, which could silently drift out of sync.
+ * The five points and their horizontal spacing (5, 12, 22 times a shared unit, `mUnit` below) are
+ * also a direct port of C0102Vh's own `m()`/`d()` methods -- unlike the class's SCALE unit, `m()`
+ * only reads Paint metrics (`measureText`, `ascent`) and `this.b.y`, so it has no dependency on
+ * anything this codebase lacks, and resolves precisely.
+ *
+ * One single quantity does NOT resolve precisely: the draw method's vinculum-height/thickness
+ * base (`float fK2 = k() * 0.9f`) calls a `float k()` declared on the superclass
+ * `AbstractC0335wD` (a DIFFERENT method from `C0102Vh`'s own `AbstractC0335wD k()` child-getter --
+ * two distinct obfuscated methods the decompiler happened to print with the same name), which
+ * resolves to `Tg.HiPER(this.G.i) * this.D * this.G.HiPER` -- a value from HiPER Calc's own
+ * theme/style object that this codebase has no equivalent of and cannot know the true magnitude
+ * of. Substituting the closest literal guess (`paint.getTextSize()`) produced a wildly broken
+ * render (confirmed on-device: a solid blob dwarfing the whole glyph), since that value is clearly
+ * far larger than intended.
+ *
+ * Instead of tuning `fK2` to an arbitrary multiplier, it's set to match {@link FractionVisual}'s
+ * OWN already-faithfully-ported bar thickness exactly: `paint.measureText(" ") * 0.3f` (from
+ * `FractionVisual`'s doc comment: "Exact bar thickness from Qg.java line 121:
+ * AbstractC0335wD.HiPER(paint, 0.3f) = measureText(" ") * 0.3f" -- a DIFFERENT HiPER Calc visual
+ * class, but the same underlying `measureText(" ") * constant` idiom for line thickness that
+ * recurs across this app's visuals). This isn't a guess: it makes the radical sign's stroke and
+ * the fraction bar's stroke the same visual weight by construction, which is both a reasonable
+ * design default and grounded in an already-verified piece of the original codebase, rather than
+ * an unrelated magnitude picked by eye.
  */
 public class SqrtVisual extends MathVisual {
+
     public final SqrtNode sqrtNode;
     public MathVisual radicandVisual;
     public MathVisual degreeVisual;
-
-    // Geometry computed once in calculateLayout() and reused as-is by draw() -- see class doc.
-    private float tickWidth;
-    private float tickHeight;
-    private float thickness;
-    private float startX;
-    private float contentGap;
-    // How far the tick/vinculum/radicand are pushed down from this visual's own top, to leave
-    // room for the degree floating above the vinculum (n-th root only; 0 for plain √x).
-    private float vinculumY;
 
     public SqrtVisual(SqrtNode node) {
         super(node);
         this.sqrtNode = node;
     }
 
+    /**
+     * Ported from C0102Vh's own {@code m()}: a font-size-based scale unit for the tick's
+     * geometry, gently grown (0.15x factor) for taller content and explicitly clamped to
+     * {@code [1.0, 1.6]} -- so the tick's own size stays close to normal even under a very tall
+     * radicand (e.g. a fraction of a fraction), instead of growing without bound.
+     */
+    private static float mUnit(Paint paint, float ownHeight) {
+        float spaceWidth = paint.measureText(" ");
+        float refHeight = (spaceWidth * 0.6f) + (-paint.ascent());
+        float growth = 1.0f + (((ownHeight - refHeight) * 0.15f) / refHeight);
+        growth = Math.min(1.6f, Math.max(1.0f, growth));
+        return growth * (spaceWidth / 10.0f);
+    }
+
+    /** Ported from C0102Vh's own {@code d()}: horizontal space reserved before the radicand. */
+    private static float tickSpan(Paint paint, float ownHeight) {
+        float spaceWidth = paint.measureText(" ");
+        return ((mUnit(paint, ownHeight) - (spaceWidth / 10.0f)) * 22.0f) + (2.7f * spaceWidth);
+    }
+
+    /** Ported from C0102Vh's own {@code mo63HiPER()} layout method. */
     @Override
     public void calculateLayout(Paint basePaint) {
         Paint paint = new Paint(basePaint);
         paint.setTextSize(basePaint.getTextSize() * D);
 
-        // Measure degree if present. Per standard math typesetting (matching plain LaTeX
-        // \sqrt[n]{...}), the degree floats ABOVE the vinculum, tucked over the tick's rising
-        // stroke -- not down at the baseline (a previous version placed it at the bottom, which
-        // looked wrong; found 2026-09-26 when a real n-th-root button first exercised this code
-        // path, see specs/btn_sqrt.md).
-        float degreeWidth = 0.0f;
-        float degreeHeight = 0.0f;
-        if (degreeVisual != null) {
-            degreeVisual.setScale(D * 0.6f);
-            degreeVisual.calculateLayout(basePaint);
-            degreeWidth = degreeVisual.b.x;
-            degreeHeight = degreeVisual.b.y;
-        }
+        float smallMargin = paint.measureText(" ") * 0.6f;
 
-        // Measure radicand under root line
+        float radicandBaseline;
+        float radicandWidth;
         if (radicandVisual != null) {
             radicandVisual.setScale(D);
             radicandVisual.calculateLayout(basePaint);
+            radicandBaseline = radicandVisual.m;
+            radicandWidth = radicandVisual.b.x;
+        } else {
+            radicandBaseline = -paint.ascent();
+            radicandWidth = 0.0f;
         }
+        float radicandHeight = radicandVisual != null ? radicandVisual.b.y : 0.0f;
 
-        float radicandW = radicandVisual != null ? radicandVisual.b.x : paint.measureText("0") * 0.8f;
-        float radicandH = radicandVisual != null ? radicandVisual.b.y : (-paint.ascent() + paint.descent());
-        float radicandM = radicandVisual != null ? radicandVisual.m : -paint.ascent();
-
-        // Breathing room between the vinculum and the content's own top/left, proportional to
-        // the content's height so it doesn't look oversized for a single digit or cramped for a
-        // tall fraction/power underneath the root -- content should never touch the radical
-        // sign's strokes directly.
-        float topMargin = radicandH * 0.22f;
-        tickHeight = radicandH + topMargin;
-        // The tick (checkmark) portion's width scales with its own height, like a real radical
-        // glyph -- a taller root gets a proportionally wider hook, not a fixed pixel width.
-        tickWidth = tickHeight * 0.32f;
-        thickness = Math.max(1.6f, paint.getTextSize() * 0.05f);
-        contentGap = radicandH * 0.12f;
-
-        // The degree sits entirely above the vinculum (never overlapping it -- see the clipping
-        // note below), but vertically CENTERED within that reserved band rather than flush with
-        // this visual's own top, and shifted slightly to the LEFT of the tick's own start (by
-        // pushing the tick's startX right instead of giving the degree a negative x, for the same
-        // reason as the vertical fix: a negative coordinate is silently clipped, since MathVisual
-        // has no notion of a child rendering outside its own declared [0, b.y]/[0, b.x] box).
-        // Reserving MORE than the degree's own height (1.35x) leaves room to center it instead of
-        // pinning it flush top or flush bottom -- pinning it flush top was the very first version
-        // and looked disconnected from the radical sign; the user's own reference showed it
-        // hugging the tick, roughly centered over its rising stroke.
-        float degreeLeftShift = degreeVisual != null ? degreeWidth * 0.35f : 0.0f;
-        vinculumY = degreeVisual != null ? degreeHeight * 1.35f : 0.0f;
-
-        float totalW = degreeLeftShift + tickWidth + contentGap + radicandW + (thickness * 0.5f);
-        float totalH = vinculumY + tickHeight;
-
-        // Radical bar baseline alignment
-        float fRadicandBaseline = (totalH - radicandH) + radicandM;
-        this.m = fRadicandBaseline;
-
-        // Position children
-        startX = degreeLeftShift;
         if (degreeVisual != null) {
-            // Vertically centered in [0, vinculumY]; horizontally flush at x=0, i.e. shifted left
-            // of the tick's own start (startX) by degreeLeftShift.
-            degreeVisual.setPosition(0, (vinculumY - degreeHeight) / 2.0f);
-        }
+            degreeVisual.setScale(D * 0.75f);
+            degreeVisual.calculateLayout(basePaint);
+            float degreeBaseline = degreeVisual.m;
+            float reserve = (radicandHeight * 0.4f) + smallMargin;
 
-        float radicandX = startX + tickWidth + contentGap;
-        float radicandY = vinculumY + (tickHeight - radicandH);
-        if (radicandVisual != null) {
-            radicandVisual.setPosition(radicandX, radicandY);
+            if (reserve > degreeBaseline) {
+                this.m = radicandBaseline + smallMargin;
+                b.y = radicandHeight + smallMargin;
+                float span = tickSpan(paint, b.y);
+                degreeVisual.setPosition(0.0f, reserve - degreeBaseline);
+                if (radicandVisual != null) {
+                    radicandVisual.setPosition(degreeVisual.b.x + span, smallMargin);
+                }
+                b.x = radicandWidth + span + degreeVisual.b.x + (b.y * 0.1f);
+            } else {
+                this.m = radicandBaseline + degreeBaseline - reserve + smallMargin;
+                b.y = radicandHeight + degreeBaseline - reserve + smallMargin;
+                float span = tickSpan(paint, b.y);
+                degreeVisual.setPosition(0.0f, 0.0f);
+                if (radicandVisual != null) {
+                    radicandVisual.setPosition(degreeVisual.b.x + span, degreeBaseline - reserve + smallMargin);
+                }
+                b.x = radicandWidth + span + degreeVisual.b.x + (b.y * 0.1f);
+            }
+        } else {
+            this.m = radicandBaseline + smallMargin;
+            b.y = radicandHeight + smallMargin;
+            float span = tickSpan(paint, b.y);
+            if (radicandVisual != null) {
+                radicandVisual.setPosition(span, smallMargin);
+            }
+            b.x = radicandWidth + span + (b.y * 0.1f);
         }
-
-        b.x = totalW;
-        b.y = totalH;
     }
 
+    /** Ported from C0102Vh's own {@code HiPER(Canvas, String)} draw method -- see class doc. */
     @Override
     public void draw(Canvas canvas, Paint basePaint) {
         Paint paint = new Paint(basePaint);
         paint.setTextSize(basePaint.getTextSize() * D);
 
-        // Anatomy of the tick, all relative to tickHeight (computed in calculateLayout): start
-        // at mid-height, dip down to a low point (the checkmark's notch), then rise sharply to
-        // the vinculum, then run the vinculum horizontally to the right edge. Shifted down by
-        // vinculumY so there's room above for a floating degree (n-th root only; 0 for √x).
-        float bottomY = vinculumY + tickHeight;
-        float topY = vinculumY;
+        float radicandHeight = radicandVisual != null ? radicandVisual.b.y : 0.0f;
+        float radicandTopY = radicandVisual != null ? radicandVisual.HiPER.y : 0.0f;
+        float fM = mUnit(paint, b.y);
+        float f2 = degreeVisual != null ? degreeVisual.b.x - (3.0f * fM) : 0.0f;
+        float f3 = (radicandHeight * 0.5f) + radicandTopY;
+        // Same thickness as FractionVisual's own bar: paint.measureText(" ") * 0.3f.
+        float fK2 = paint.measureText(" ") * 0.3f;
+        float f5 = 2.0f * fK2;
+        float fB = (((b.y - this.m) / 3.0f) * 2.0f) + this.m;
 
-        PointF p0 = new PointF(startX, vinculumY + (tickHeight * 0.62f));
-        PointF p1 = new PointF(startX + (tickWidth * 0.32f), vinculumY + (tickHeight * 0.82f));
-        PointF p2 = new PointF(startX + (tickWidth * 0.6f), bottomY);
-        PointF p3 = new PointF(startX + tickWidth, topY);
-        PointF p4 = new PointF(b.x, topY);
+        PointF p0 = new PointF(f2, f3);
+        PointF p1 = new PointF((5.0f * fM) + f2, f3 - (2.0f * fM));
+        PointF p2 = new PointF((12.0f * fM) + f2, fB);
+        PointF p3 = new PointF((22.0f * fM) + f2, f5);
+        PointF p4 = new PointF(b.x, f5);
 
         PointF[] pointFArr = new PointF[]{p0, p1, p2, p3, p4};
 
-        float fThickness = thickness;
         float f4 = 2.0f;
-        float[] fArr = new float[]{fThickness * 0.9f, fThickness * 1.2f, fThickness * 1.6f, fThickness};
+        float[] fArr = new float[]{fK2, 2.0f * fK2, fK2, fK2};
         float[] fArr2 = new float[4];
         float[] fArr3 = new float[4];
         float[] fArr4 = new float[4];
         float[] fArr5 = new float[4];
 
-        int i5 = 4;
-        for (int i6 = 0; i6 < i5; i6++) {
+        for (int i6 = 0; i6 < 4; i6++) {
             int i7 = i6 + 1;
             PointF pNext = pointFArr[i7];
             PointF pCur = pointFArr[i6];
@@ -252,33 +260,28 @@ public class SqrtVisual extends MathVisual {
     // No getCursorPosition() override -- the default MathVisual behavior (index 0/1 -> just
     // outside this visual's own box) is exactly right for CursorPointer(sqrtNode, 0/1)
     // (Center-before/after the whole sqrt), same as PowerVisual/FractionVisual don't override it
-    // either. A previous version of this method unconditionally delegated straight into
-    // radicandVisual regardless of index, which was wrong even for plain √x (ignored the
-    // Center-before/after case entirely) and became reachable more often once an n-th-root
-    // button started actually using the degree slot -- see specs/btn_sqrt.md.
+    // either.
 
     @Override
-    public com.calctastic.sample.hypercal.engine.model.CursorPointer hitTest(PointF point, Paint basePaint) {
+    public CursorPointer hitTest(PointF point, Paint basePaint) {
         // Mirrors PowerVisual.hitTest's shape: degree (if present) takes priority on its own
         // horizontal span, then radicand, matching reading order (degree, then the radical).
-        // Previously this ignored degreeVisual entirely, so tapping the degree box would fall
-        // through to the radicand instead.
         if (degreeVisual != null) {
             float degLeft = degreeVisual.HiPER.x;
             float degRight = degLeft + degreeVisual.b.x;
             if (point.x >= degLeft && point.x <= degRight) {
                 PointF localPoint = new PointF(point.x - degLeft, point.y - degreeVisual.HiPER.y);
-                com.calctastic.sample.hypercal.engine.model.CursorPointer hit = degreeVisual.hitTest(localPoint, basePaint);
+                CursorPointer hit = degreeVisual.hitTest(localPoint, basePaint);
                 if (hit != null) return hit;
-                return new com.calctastic.sample.hypercal.engine.model.CursorPointer(sqrtNode.degree, 0);
+                return new CursorPointer(sqrtNode.degree, 0);
             }
         }
         if (radicandVisual != null) {
             PointF localPoint = new PointF(point.x - radicandVisual.HiPER.x, point.y - radicandVisual.HiPER.y);
-            com.calctastic.sample.hypercal.engine.model.CursorPointer hit = radicandVisual.hitTest(localPoint, basePaint);
+            CursorPointer hit = radicandVisual.hitTest(localPoint, basePaint);
             if (hit != null) return hit;
-            return new com.calctastic.sample.hypercal.engine.model.CursorPointer(sqrtNode.radicand, 0);
+            return new CursorPointer(sqrtNode.radicand, 0);
         }
-        return new com.calctastic.sample.hypercal.engine.model.CursorPointer(sqrtNode, 0);
+        return new CursorPointer(sqrtNode, 0);
     }
 }
