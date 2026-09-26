@@ -193,14 +193,23 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
 
 ### B. Belum Dikerjakan
 - [ ] **Task 10: Mode linear `a/b`** (`Qg.a`, `Qg.java` baris 96–126): render sebaris dengan `'/'`, anak tidak diskala 0.8, baseline `max(numM, -ascent, denM)`.
-- [ ] **Task 11: Padding nested fraction `m$3()`**: lebar `+= 2 × m$3()` bila anak berupa pecahan; garis dari `fMin - m$3()` sampai `F()`.
+- [x] **Task 11: Padding nested fraction `m$3()`**
+  - `FractionVisual.calculateLayout`: `m3 = spaceWidth × 1.0f` bila pembilang/penyebut adalah `FractionVisual` lagi, else 0. `numX`/`denX` digeser `+m3`, `b.x = maxW + 2×m3`.
+  - Garis pecahan tetap digambar `0..b.x` — karena pembilang/penyebut sudah digeser `+m3`, versi asli `fMin - m$3()` otomatis kembali ke 0 dan `F()` (perkiraan `b.x`) mencakup padding baru, jadi rumusnya sama saja secara efektif.
+  - Uji emulator: `a/b 1 ▶ a/b 2 ▶` → `\frac{1}{\frac{2}{□}}`, garis luar tampak melebar mengakomodasi pecahan bertingkat.
 - [x] **Task 12: Navigasi atas/bawah** (`Qg.HiPER(PointF, Df)` / `Qg.E(PointF, Df)`): pindah pembilang ↔ penyebut, x di-clamp dengan margin `ZD.ab (0.2) × density`. Perlu tombol ▲/▼.
   - Selesai: baris tombol baru `btn_cursor_up` / `btn_cursor_down` (di atas ◀ / ▶) di `activity_hypercal.xml`; `HyperCalDisplayView.findVerticalCursorTarget()` mencari pecahan terdekat lalu hit-test slot seberang dengan x kursor. Uji: `a/b 123 ▼ 7 ▲ 5` → `\frac{1253}{7}` (5 masuk di posisi x yang sama).
-- [ ] **Task 13: Geometri placeholder persis `C0357yG`**: `m = -ascent + 0.9 × density`, `b.y = m + descent`, kotak dari `fB = (b() - E())/2` sampai `E() + fB`. (Rumus `textSize × 0.9` di Bagian 3 tidak sesuai kode.)
+- [x] **Task 13: Geometri placeholder persis `C0357yG`**
+  - `PlaceholderVisual`: `m = -ascent + 0.9 × density`, `b.y = descent + m`. Kotak digambar dari `y=0` sampai `y=b.y` (versi kita tidak mengimplementasikan padding vertikal `L` milik `AbstractC0335wD`, jadi `fB` disederhanakan jadi 0 — ini simplifikasi yang disengaja, bukan berdasarkan kode).
+  - Rumus lama (`textSize × 0.9`, kotak berpusat di `m ± ascent×0.9`) sudah tidak dipakai.
 - [ ] **Task 14: Mode placeholder tersembunyi `C0357yG.E()` / `QA.B()` / `QA.D()`**: tidak digambar, lebar ±cursorWidth, kursor di (0,0). Plus mode elipsis `"…"` (`qa.b()`) dan label argumen `L()`.
 - [ ] **Task 15: Warna garis & kotak** memakai warna tema `HiPER(paint, strHiPER)`, bukan `#80FFFFFF` hardcode.
-- [ ] **Task 16: Hapus clamp `Math.max(1.5f, …)`** pada gap, tebal garis, dan stroke placeholder (tidak ada di kode asli).
-- [ ] **Task 17: Geometri kursor `mo359/mo360`**: tinggi = tinggi penuh visual (`0..b.y`), x index 0 = `-0.5w`, index 1 = `b.x + 0.5w`; kursor placeholder tidak di tengah kotak.
+- [x] **Task 16: Hapus clamp `Math.max(1.5f, …)`** pada gap, tebal garis (`FractionVisual`), dan stroke placeholder (`PlaceholderVisual`). Clamp lebar kursor `Math.max(3.0f/2.0f, …)` di `MathVisual.getCursorWidth` dan `HyperCalDisplayView` juga dihapus (menyatu dengan Display Task 9).
+- [x] **Task 17: Geometri kursor `mo359/mo360`**
+  - `MathVisual.getCursorRect` (default) sekarang persis rumus dasar `AbstractC0335wD`: tinggi penuh `0..b.y`, lebar berpusat di `getCursorPosition(index).x`.
+  - `MathVisual.getCursorPosition` default: index 0 → `-0.5w`, selain itu → `b.x + 0.5w`. Dipakai oleh `FractionVisual` (Center sebelum/sesudah) dan `PlaceholderVisual` (kotak kosong).
+  - **Temuan:** `C0357yG` (placeholder) tidak override `mo359HiPER`, jadi kursor di kotak kosong sebenarnya nongkrong di kiri kotak (`-w..0`), bukan di tengah seperti sebelumnya. Sudah dicek visual di emulator (`a/b` pada display kosong) — kursor persis di tepi kiri kotak pembilang.
+  - `NumberVisual` posisi kursor antar-digit tetap dipertahankan seperti semula (bukan hasil decompile pasti — lihat catatan di bawah).
 - [ ] **Task 18: Verifikasi hit-test `Qg.HiPER(PointF,bool,bool)` via smali** — JADX gagal decompile; fragmen menunjukkan perbandingan ke titik tengah, bukan batas min/max anak.
 - [x] **Task 20: a/b tepat setelah pecahan membungkus pecahan itu sendiri (bug dari Task 7)**
   - Repro: `a/b 1 ▶ 2 ▶ a/b` → `\frac{\frac{1}{2}}{□}`, kursor langsung di penyebut.
@@ -215,6 +224,6 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
 ### C. Urutan Prioritas Pengerjaan
 1. ~~**Perilaku (langsung terasa pengguna):** Task 20 → Task 19 → Task 12 → verifikasi tap kiri/kanan pecahan (sisa Task 5).~~ ✅ selesai 2026-09-26
 2. ~~**Skala display:** `display_scaling_typography.md` Task 7.~~ ✅ selesai 2026-09-26
-3. **Akurasi render:** Task 13 → Task 17 → Task 11 → Task 16 (+ display Task 9).
+3. ~~**Akurasi render:** Task 13 → Task 17 → Task 11 → Task 16 (+ display Task 9).~~ ✅ selesai 2026-09-26
 4. **Warna tema:** Task 15 (+ display Task 8).
 5. **Fitur tambahan:** Task 10 → Task 14 (+ display Task 10).

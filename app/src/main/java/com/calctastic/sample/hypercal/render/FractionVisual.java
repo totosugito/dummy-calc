@@ -54,15 +54,20 @@ public class FractionVisual extends MathVisual {
 
         // Qg.java lines 116, 121, 124: AbstractC0335wD.HiPER(paint, f) = paint.measureText(" ") * f
         float spaceWidth = paint.measureText(" ");
-        float gapAbove = Math.max(1.5f, spaceWidth * 0.2f);
-        float barThickness = Math.max(1.5f, spaceWidth * 0.3f);
-        float gapBelow = Math.max(1.5f, spaceWidth * 0.2f);
+        float gapAbove = spaceWidth * 0.2f;
+        float barThickness = spaceWidth * 0.3f;
+        float gapBelow = spaceWidth * 0.2f;
+
+        // Qg.java line 214-221 (m$3()): extra side padding when a child is itself a fraction,
+        // so a nested fraction's bar doesn't touch this one's.
+        float m3 = (numeratorVisual instanceof FractionVisual || denominatorVisual instanceof FractionVisual)
+                ? spaceWidth * 1.0f : 0.0f;
 
         // Qg.java line 113: pointF.x = (m$3() * 2.0f) + Math.max(f2, f5)
         float maxW = Math.max(numW, denW);
 
-        // Position numerator centered horizontally above fraction bar
-        float numX = (maxW - numW) / 2.0f;
+        // Position numerator centered horizontally above fraction bar, offset by m$3() padding
+        float numX = m3 + (maxW - numW) / 2.0f;
         float numY = 0.0f;
         if (numeratorVisual != null) {
             numeratorVisual.setPosition(numX, numY);
@@ -72,13 +77,14 @@ public class FractionVisual extends MathVisual {
         barY = numH + gapAbove;
 
         // Position denominator centered horizontally below fraction bar (Qg.java line 124)
-        float denX = (maxW - denW) / 2.0f;
+        float denX = m3 + (maxW - denW) / 2.0f;
         float denY = barY + barThickness + gapBelow;
         if (denominatorVisual != null) {
             denominatorVisual.setPosition(denX, denY);
         }
 
-        b.x = maxW;
+        // Qg.java line 113: width = 2*m$3() + max(numW, denW)
+        b.x = maxW + 2.0f * m3;
         b.y = denY + denH;
 
         // Qg.java line 129: this.m = ((-paint6.ascent()) * 0.4f) + f13 (where f13 = this.c = barY)
@@ -91,9 +97,11 @@ public class FractionVisual extends MathVisual {
         paint.setTextSize(basePaint.getTextSize() * D);
 
         float spaceWidth = paint.measureText(" ");
-        float barThickness = Math.max(1.5f, spaceWidth * 0.3f);
+        float barThickness = spaceWidth * 0.3f;
 
-        // Draw Fraction Bar: Qg.java line 298: canvas.drawRect(left, barY, right, barY + thickness, paint);
+        // Draw Fraction Bar: Qg.java line 304-313: canvas.drawRect(fMin - m$3(), barY, F(), barY + thickness, paint).
+        // fMin (leftmost of numerator/denominator) already includes the m$3() left padding added in
+        // calculateLayout, so fMin - m$3() cancels back to 0 and F() is the full (padded) width b.x.
         Paint barPaint = new Paint(paint);
         barPaint.setStyle(Paint.Style.FILL);
         canvas.drawRect(0.0f, barY, b.x, barY + barThickness, barPaint);
@@ -115,28 +123,8 @@ public class FractionVisual extends MathVisual {
         }
     }
 
-    @Override
-    public PointF getCursorPosition(int index, Paint basePaint) {
-        // Index 0: Center position before fraction
-        if (index == 0) {
-            return new PointF(0.0f, m);
-        }
-        // Index 1: Center position after fraction
-        return new PointF(b.x, m);
-    }
-
-    @Override
-    public android.graphics.RectF getCursorRect(int index, Paint basePaint) {
-        PointF p = getCursorPosition(index, basePaint);
-        Paint paint = new Paint(basePaint);
-        paint.setTextSize(basePaint.getTextSize() * D);
-        float cursorWidth = getCursorWidth(basePaint);
-        float halfWidth = cursorWidth / 2.0f;
-        float cy = p.y;
-        float topY = cy - (-paint.ascent());
-        float bottomY = cy + paint.descent();
-        return new android.graphics.RectF(p.x - halfWidth, topY, p.x + halfWidth, bottomY);
-    }
+    // Center slot before/after the fraction: Qg does not override mo359HiPER(int), so the
+    // MathVisual default applies (nudged just outside the fraction's bounds).
 
     /**
      * Hit testing: 100% FAITHFUL TO Qg.java lines 144-186:

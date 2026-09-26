@@ -328,7 +328,7 @@ public class HyperCalDisplayView extends View {
             } else {
                 float cx = startX + currentRootVisual.b.x;
                 float cyBaseline = startY + currentRootVisual.m;
-                float halfWidth = Math.max(3.0f, textPaint.measureText(" ") * 0.35f) / 2.0f;
+                float halfWidth = (textPaint.measureText(" ") * 0.35f) / 2.0f;
                 cursorRect = new RectF(cx - halfWidth, cyBaseline - (-textPaint.ascent()), cx + halfWidth, cyBaseline + textPaint.descent());
             }
 

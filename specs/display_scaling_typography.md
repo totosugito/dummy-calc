@@ -112,7 +112,7 @@ $$\text{screenScale} = \text{mo352HiPER}() = \mathbf{Tg.HiPER(V.HiPER)}$$
   - **Hasil emulator 1080×2424 @420dpi:** `1.2 × 1080/266 × 14 ≈ 68.2 px` (sebelumnya 54.8 px). Klaim "88–92 px" di Bagian 3 tidak sesuai kode asli.
   - Asumsi yang belum terbukti: kelas keypad aktif adalah `C0341wd` (bukan `BD`/`C0081Pe`/`C0271pD`), cabang `Tk.xa = false`, dan mode bukan `EnumC0051Ha.c`.
 - [ ] **Task 8: Paint per visual via `k$1()`**: typeface + style dari `C0215jD`, warna dari tema key `"86"`. Hilangkan hardcode `0xFFFFFFFF` (teks) & `0xFF2196F3` (kursor).
-- [ ] **Task 9: Hapus clamp lebar kursor** `Math.max(3.0f, …)` / `Math.max(2.0f, …)`.
+- [x] **Task 9: Hapus clamp lebar kursor** `Math.max(3.0f, …)` / `Math.max(2.0f, …)` — dihapus di `HyperCalDisplayView` (fallback root cursor) dan `render/MathVisual.getCursorWidth` (dipakai semua visual).
 - [ ] **Task 10: Scroll, clip & wrap multi-baris** (`UF.java` baris 436–440, 638): `canvas.clipRect` dengan offset `B`, batas lebar `G.m` untuk wrap.
 - [x] **Task 11: Bersihkan Javadoc usang** di `HyperCalDisplayView` (masih menyebut `22sp`, `R.font.math_symbols`).
 - [ ] **Task 12: Pastikan string ukur `HcZgWQ.LiVE`** pada `AbstractC0335wD.HiPER(paint, f)` memang `" "` (diisi saat runtime).
