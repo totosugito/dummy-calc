@@ -88,7 +88,7 @@
                 style="@style/CalcSimpleButton.Secondary" />
         </TableRow>
 
-        <!-- Row 2: a/b , √x , % , ( , ) -->
+        <!-- Row 2: a/b , a b/c , √x , ( , ) -->
         <TableRow
             android:layout_width="match_parent"
             android:layout_height="0dp"
@@ -99,12 +99,13 @@
                 android:text="a/b"
                 style="@style/CalcSimpleButton.Function" />
             <Button
-                android:id="@+id/btn_sqrt"
-                android:text="√x"
+                android:id="@+id/btn_mixed_fraction"
+                android:text="a b/c"
+                android:textSize="11sp"
                 style="@style/CalcSimpleButton.Function" />
             <Button
-                android:id="@+id/btn_percent"
-                android:text="%"
+                android:id="@+id/btn_sqrt"
+                android:text="√x"
                 style="@style/CalcSimpleButton.Function" />
             <Button
                 android:id="@+id/btn_paren_open"
@@ -116,12 +117,18 @@
                 style="@style/CalcSimpleButton.Function" />
         </TableRow>
 
-        <!-- Row 2b: vertical cursor navigation ▲ / ▼ (Qg up/down), aligned above ◀ / ▶ -->
+        <!-- Row 2b: % (moved here to make room for a b/c above) + vertical cursor
+             navigation ▲ / ▼ (Qg up/down), aligned above ◀ / ▶ -->
         <TableRow
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="0.6">
 
+            <Button
+                android:id="@+id/btn_percent"
+                android:layout_column="2"
+                android:text="%"
+                style="@style/CalcSimpleButton.Function" />
             <Button
                 android:id="@+id/btn_cursor_up"
                 android:layout_column="3"

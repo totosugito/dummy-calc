@@ -7,8 +7,15 @@ package com.calctastic.sample.hypercal.engine.model;
  * Numerator and denominator are always SequenceNode slots (HiPER GA inside C0067Lb),
  * so each slot can hold several tokens (e.g. 1+2). An empty slot holds a single
  * EmptyNode (QA) so the placeholder box stays visible.
+ *
+ * A mixed number ("a b/c" button) is the same C0067Lb node kind reused with a third
+ * child slot for the whole-number part (HiPER EnumC0300sa.sa, a 3-child variant of the
+ * plain 2-child fraction EnumC0300sa.mB -- see Rc.java:384-392). {@link #integerPart} is
+ * null for a plain a/b fraction and non-null for a mixed number; use {@link #createMixed}
+ * to build one.
  */
 public class FractionNode extends ExpressionNode {
+    public SequenceNode integerPart;
     public SequenceNode numerator;
     public SequenceNode denominator;
 
@@ -17,6 +24,18 @@ public class FractionNode extends ExpressionNode {
         this.numerator.setParent(this);
         this.denominator = toSlot(denominator);
         this.denominator.setParent(this);
+    }
+
+    /** Builds a mixed number "integerPart numerator/denominator" (HiPER EnumC0300sa.sa). */
+    public static FractionNode createMixed(ExpressionNode integerPart, ExpressionNode numerator, ExpressionNode denominator) {
+        FractionNode frac = new FractionNode(numerator, denominator);
+        frac.integerPart = toSlot(integerPart);
+        frac.integerPart.setParent(frac);
+        return frac;
+    }
+
+    public boolean isMixed() {
+        return integerPart != null;
     }
 
     private static SequenceNode toSlot(ExpressionNode node) {
@@ -45,11 +64,17 @@ public class FractionNode extends ExpressionNode {
 
     @Override
     public int getChildCount() {
-        return 2;
+        return isMixed() ? 3 : 2;
     }
 
     @Override
     public ExpressionNode getChild(int index) {
+        if (isMixed()) {
+            if (index == 0) return integerPart;
+            if (index == 1) return numerator;
+            if (index == 2) return denominator;
+            return null;
+        }
         if (index == 0) return numerator;
         if (index == 1) return denominator;
         return null;
@@ -57,6 +82,10 @@ public class FractionNode extends ExpressionNode {
 
     @Override
     public boolean removeChild(ExpressionNode child) {
+        if (child == integerPart) {
+            integerPart = null;
+            return true;
+        }
         if (child == numerator) {
             numerator = null;
             return true;
@@ -72,6 +101,10 @@ public class FractionNode extends ExpressionNode {
     public String toLatexString() {
         String num = numerator != null ? numerator.toLatexString() : "";
         String den = denominator != null ? denominator.toLatexString() : "";
+        if (isMixed()) {
+            String intStr = integerPart != null ? integerPart.toLatexString() : "";
+            return intStr + "\\ \\frac{" + num + "}{" + den + "}";
+        }
         return "\\frac{" + num + "}{" + den + "}";
     }
 }

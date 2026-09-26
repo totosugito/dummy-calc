@@ -19,6 +19,7 @@ import com.calctastic.sample.hypercal.engine.model.FractionNode;
  */
 public class FractionVisual extends MathVisual {
     public final FractionNode fractionNode;
+    public MathVisual integerVisual;
     public MathVisual numeratorVisual;
     public MathVisual denominatorVisual;
     public float barY;
@@ -35,6 +36,13 @@ public class FractionVisual extends MathVisual {
 
         // HiPER Calc Qg.java lines 36 & 61: exactly 0.8f scale for fraction children
         float childScale = D * 0.8f;
+
+        // Mixed number ("a b/c", EnumC0300sa.sa) integer part: drawn at full size to the left
+        // of the num/den stack, not scaled down like the numerator/denominator.
+        if (integerVisual != null) {
+            integerVisual.setScale(D);
+            integerVisual.calculateLayout(basePaint);
+        }
 
         if (numeratorVisual != null) {
             numeratorVisual.setScale(childScale);
@@ -66,8 +74,14 @@ public class FractionVisual extends MathVisual {
         // Qg.java line 113: pointF.x = (m$3() * 2.0f) + Math.max(f2, f5)
         float maxW = Math.max(numW, denW);
 
+        // Reserve room to the left for the mixed-number integer part, plus a small gap
+        // (not present in Qg -- the plain fraction has no integer child).
+        float intW = integerVisual != null ? integerVisual.b.x : 0.0f;
+        float intGap = integerVisual != null ? spaceWidth * 0.5f : 0.0f;
+        float stackX = intW + intGap;
+
         // Position numerator centered horizontally above fraction bar, offset by m$3() padding
-        float numX = m3 + (maxW - numW) / 2.0f;
+        float numX = stackX + m3 + (maxW - numW) / 2.0f;
         float numY = 0.0f;
         if (numeratorVisual != null) {
             numeratorVisual.setPosition(numX, numY);
@@ -77,15 +91,21 @@ public class FractionVisual extends MathVisual {
         barY = numH + gapAbove;
 
         // Position denominator centered horizontally below fraction bar (Qg.java line 124)
-        float denX = m3 + (maxW - denW) / 2.0f;
+        float denX = stackX + m3 + (maxW - denW) / 2.0f;
         float denY = barY + barThickness + gapBelow;
         if (denominatorVisual != null) {
             denominatorVisual.setPosition(denX, denY);
         }
 
-        // Qg.java line 113: width = 2*m$3() + max(numW, denW)
-        b.x = maxW + 2.0f * m3;
+        // Qg.java line 113: width = 2*m$3() + max(numW, denW), plus the integer part + gap
+        b.x = stackX + maxW + 2.0f * m3;
         b.y = denY + denH;
+
+        if (integerVisual != null) {
+            // Vertically center the integer part against the whole mixed-number height
+            integerVisual.setPosition(0.0f, (b.y - integerVisual.b.y) / 2.0f);
+            b.y = Math.max(b.y, integerVisual.b.y);
+        }
 
         // Qg.java line 129: this.m = ((-paint6.ascent()) * 0.4f) + f13 (where f13 = this.c = barY)
         this.m = ((-paint.ascent()) * 0.4f) + barY;
@@ -102,9 +122,18 @@ public class FractionVisual extends MathVisual {
         // Draw Fraction Bar: Qg.java line 304-313: canvas.drawRect(fMin - m$3(), barY, F(), barY + thickness, paint).
         // fMin (leftmost of numerator/denominator) already includes the m$3() left padding added in
         // calculateLayout, so fMin - m$3() cancels back to 0 and F() is the full (padded) width b.x.
+        float barLeft = integerVisual != null ? integerVisual.HiPER.x + integerVisual.b.x + spaceWidth * 0.5f : 0.0f;
         Paint barPaint = new Paint(paint);
         barPaint.setStyle(Paint.Style.FILL);
-        canvas.drawRect(0.0f, barY, b.x, barY + barThickness, barPaint);
+        canvas.drawRect(barLeft, barY, b.x, barY + barThickness, barPaint);
+
+        // Draw mixed-number integer part
+        if (integerVisual != null) {
+            canvas.save();
+            canvas.translate(integerVisual.HiPER.x, integerVisual.HiPER.y);
+            integerVisual.draw(canvas, basePaint);
+            canvas.restore();
+        }
 
         // Draw Numerator
         if (numeratorVisual != null) {
@@ -134,6 +163,13 @@ public class FractionVisual extends MathVisual {
      */
     @Override
     public com.calctastic.sample.hypercal.engine.model.CursorPointer hitTest(PointF point, Paint basePaint) {
+        if (integerVisual != null && point.x < integerVisual.HiPER.x + integerVisual.b.x) {
+            PointF localPoint = new PointF(point.x - integerVisual.HiPER.x, point.y - integerVisual.HiPER.y);
+            com.calctastic.sample.hypercal.engine.model.CursorPointer hit = integerVisual.hitTest(localPoint, basePaint);
+            if (hit != null) return hit;
+            return new com.calctastic.sample.hypercal.engine.model.CursorPointer(fractionNode.integerPart.getChild(0), 0);
+        }
+
         float numLeft = numeratorVisual != null ? numeratorVisual.HiPER.x : 0.0f;
         float numRight = numeratorVisual != null ? (numLeft + numeratorVisual.b.x) : b.x;
 

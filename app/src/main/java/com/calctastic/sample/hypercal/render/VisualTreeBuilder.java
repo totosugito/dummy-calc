@@ -62,6 +62,10 @@ public class VisualTreeBuilder {
         if (node instanceof FractionNode) {
             FractionNode frac = (FractionNode) node;
             FractionVisual visual = new FractionVisual(frac);
+            if (frac.integerPart != null) {
+                visual.integerVisual = buildVisualTree(frac.integerPart);
+                if (visual.integerVisual != null) visual.integerVisual.parent = visual;
+            }
             if (frac.numerator != null) {
                 visual.numeratorVisual = buildVisualTree(frac.numerator);
                 if (visual.numeratorVisual != null) visual.numeratorVisual.parent = visual;

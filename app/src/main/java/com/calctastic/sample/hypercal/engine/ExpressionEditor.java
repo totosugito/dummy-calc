@@ -197,6 +197,48 @@ public class ExpressionEditor {
         setCursor(startOf(frac.numerator));
     }
 
+    /**
+     * "a b/c" mixed-number button. Faithful to HiPER's reuse of the fraction editing
+     * path for the 3-child EnumC0300sa.sa node (C0197hd.java:734 branches on iL==3):
+     * - Cursor inside the integer part -> jumps to the numerator.
+     * - Cursor inside the numerator -> jumps to the denominator (same as plain a/b).
+     * - An operand right before the cursor is lifted into the integer part (not the
+     *   numerator, unlike plain a/b), numerator/denominator start empty.
+     * - Otherwise: a fresh mixed number with all three slots empty, cursor in the integer part.
+     */
+    public void insertMixedFraction() {
+        if (cursorPointer != null && cursorPointer.node != null) {
+            ExpressionNode slot = cursorPointer.node instanceof SequenceNode
+                    ? cursorPointer.node : cursorPointer.node.getParent();
+            FractionNode host = fractionOfSlot(slot);
+            if (host != null && host.isMixed()) {
+                if (slot == host.integerPart) {
+                    setCursor(startOf(host.numerator));
+                    return;
+                }
+                if (slot == host.numerator) {
+                    setCursor(startOf(host.denominator));
+                    return;
+                }
+            }
+
+            ExpressionNode target = cursorPointer.node;
+            if (hasOperandBeforeCursor(cursorPointer) && target.getParent() instanceof SequenceNode) {
+                SequenceNode seq = (SequenceNode) target.getParent();
+                int idx = seq.getChildIndex(target);
+                seq.removeChild(target);
+                FractionNode frac = FractionNode.createMixed(target, null, null);
+                seq.add(idx, frac);
+                setCursor(startOf(frac.numerator));
+                return;
+            }
+        }
+
+        FractionNode frac = FractionNode.createMixed(null, null, null);
+        insertAtCursor(frac);
+        setCursor(startOf(frac.integerPart));
+    }
+
     public void insertPower() {
         ExpressionNode targetBase;
         if (cursorPointer != null && cursorPointer.node != null) {
@@ -319,19 +361,30 @@ public class ExpressionEditor {
         setCursor(new CursorPointer(node, 0));
     }
 
-    /** Replaces a fraction whose denominator is empty with its numerator tokens (unwrapping). */
+    /**
+     * Replaces a fraction whose denominator is empty with its remaining tokens (unwrapping):
+     * numerator tokens for a plain a/b, or integer-part + numerator tokens for a mixed number.
+     */
     private void unwrapFraction(FractionNode frac) {
         if (!(frac.getParent() instanceof SequenceNode)) {
             return;
         }
-        if (FractionNode.isEmptySlot(frac.numerator)) {
+        boolean intEmpty = !frac.isMixed() || FractionNode.isEmptySlot(frac.integerPart);
+        boolean numEmpty = FractionNode.isEmptySlot(frac.numerator);
+        if (intEmpty && numEmpty) {
             removeFromSequence(frac);
             return;
         }
         SequenceNode seq = (SequenceNode) frac.getParent();
         int idx = seq.getChildIndex(frac);
         seq.removeChild(frac);
-        List<ExpressionNode> tokens = new ArrayList<>(frac.numerator.children);
+        List<ExpressionNode> tokens = new ArrayList<>();
+        if (!intEmpty) {
+            tokens.addAll(frac.integerPart.children);
+        }
+        if (!numEmpty) {
+            tokens.addAll(frac.numerator.children);
+        }
         for (int i = 0; i < tokens.size(); i++) {
             seq.add(idx + i, tokens.get(i));
         }
@@ -376,6 +429,24 @@ public class ExpressionEditor {
             } else if (node.getParent() == frac.denominator) {
                 // DEL in empty denominator jumps to the end of the numerator
                 setCursor(endOf(frac.numerator));
+            } else if (frac.isMixed() && node.getParent() == frac.numerator) {
+                // DEL in empty numerator (mixed number) jumps to the end of the integer part,
+                // unless the denominator is filled -- then keep the numerator box visible.
+                if (!FractionNode.isEmptySlot(frac.denominator)) {
+                    setCursor(new CursorPointer(frac, 0));
+                } else if (!FractionNode.isEmptySlot(frac.integerPart)) {
+                    setCursor(endOf(frac.integerPart));
+                } else {
+                    removeFromSequence(frac);
+                }
+            } else if (frac.isMixed() && node.getParent() == frac.integerPart) {
+                // DEL in empty integer part (mixed number, at the very start): behaves like
+                // DEL right before the whole fraction, deleting whatever precedes it.
+                if (FractionNode.isEmptySlot(frac.numerator) && FractionNode.isEmptySlot(frac.denominator)) {
+                    removeFromSequence(frac);
+                } else {
+                    deleteBefore(frac);
+                }
             } else if (FractionNode.isEmptySlot(frac.denominator)) {
                 // Both slots empty: remove the whole fraction
                 removeFromSequence(frac);
@@ -441,6 +512,8 @@ public class ExpressionEditor {
         if (frac != null) {
             if (seq == frac.denominator) {
                 setCursor(endOf(frac.numerator));
+            } else if (seq == frac.numerator && frac.isMixed()) {
+                setCursor(endOf(frac.integerPart));
             } else {
                 setCursor(new CursorPointer(frac, 0)); // Center before fraction
             }
@@ -457,9 +530,11 @@ public class ExpressionEditor {
             return;
         }
 
-        // Center before fraction: step right into the start of the numerator
+        // Center before fraction: step right into the start of the integer part (mixed
+        // number) or numerator (plain a/b)
         if (node instanceof FractionNode && cursorPointer.position == 0) {
-            setCursor(startOf(((FractionNode) node).numerator));
+            FractionNode frac = (FractionNode) node;
+            setCursor(startOf(frac.isMixed() ? frac.integerPart : frac.numerator));
             return;
         }
 
@@ -480,7 +555,9 @@ public class ExpressionEditor {
         // At the end of a fraction slot
         FractionNode frac = fractionOfSlot(seq);
         if (frac != null) {
-            if (seq == frac.numerator) {
+            if (seq == frac.integerPart) {
+                setCursor(startOf(frac.numerator));
+            } else if (seq == frac.numerator) {
                 setCursor(startOf(frac.denominator));
             } else {
                 setCursor(new CursorPointer(frac, 1)); // Center after fraction
