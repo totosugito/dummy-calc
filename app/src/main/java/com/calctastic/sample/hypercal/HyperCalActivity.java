@@ -91,6 +91,7 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
                 R.id.btn_add, R.id.btn_sub, R.id.btn_mul, R.id.btn_div, R.id.btn_percent,
                 // Functions
                 R.id.btn_sqrt, R.id.btn_fraction, R.id.btn_mixed_fraction, R.id.btn_power, R.id.btn_square, R.id.btn_reciprocal,
+                R.id.btn_cube, R.id.btn_neg_one,
                 R.id.btn_paren_open, R.id.btn_paren_close,
                 // Edit & Nav
                 R.id.btn_clear, R.id.btn_delete, R.id.btn_cursor_left, R.id.btn_cursor_right,
@@ -131,6 +132,8 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
         else if (id == R.id.btn_mixed_fraction) editor.insertMixedFraction();
         else if (id == R.id.btn_power) editor.insertPower();
         else if (id == R.id.btn_square) editor.insertSquare();
+        else if (id == R.id.btn_cube) editor.insertCube();
+        else if (id == R.id.btn_neg_one) editor.insertNegativeOnePower();
         else if (id == R.id.btn_reciprocal) editor.insertReciprocal();
         else if (id == R.id.btn_paren_open) editor.insertParenthesis();
         else if (id == R.id.btn_clear) clearAll();

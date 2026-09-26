@@ -60,8 +60,12 @@ Mengikuti ide user untuk menjadikan mekanisme "wrap base jadi power" ini reusabl
 ditambahkan lewat helper yang sama (`ExpressionEditor.insertPowerNode`, private): `insertCube()`
 ("x³", exponent tetap "3") dan `insertNegativeOnePower()` ("x⁻¹", exponent tetap "-1"). Sama seperti
 x²: exponent-nya *editable* (child `NumberNode` beneran, bukan konstanta terkunci seperti kode asli
-`EnumC0300sa.qB`), base tidak dibungkus kurung. Belum ada tombol UI untuk keduanya di
-`activity_hypercal.xml` — baru method engine-nya saja, siap dipakai kalau tombolnya mau ditambahkan.
+`EnumC0300sa.qB`), base tidak dibungkus kurung. ~~Belum ada tombol UI untuk keduanya~~
+**Update (2026-09-26):** tombol UI `btn_cube` ("x³") dan `btn_neg_one` ("x⁻¹") sekarang ada di
+baris pertama `activity_hypercal.xml` — baris tombol memory (M+/M−/MC/MS/MR) dihapus atas
+permintaan user dan slotnya dipakai untuk x³, x⁻¹, plus % / ▲ / ▼ yang naik dari baris
+navigasi lama. Sudah di-wiring di `HyperCalActivity.onClick` → `editor.insertCube()` /
+`editor.insertNegativeOnePower()`.
 
 **Bug yang sempat masuk lalu diperbaiki:** saat helper `insertPowerNode` ini pertama kali dibuat,
 urutan operasinya salah dan menyebabkan `5` → `x²` menghasilkan `55^{2}` (node lama tertinggal di

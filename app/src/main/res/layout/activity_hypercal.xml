@@ -60,32 +60,32 @@
         android:padding="2dp"
         android:stretchColumns="*">
 
-        <!-- Row 1: Memory row: M+ , M- , MC , MS , MR -->
+        <!-- Row 1: power-family row: 1/x (reciprocal = x⁻¹ in fraction form), x², x³, xʸ, x⁻¹ -->
         <TableRow
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="0.8">
+            android:layout_weight="0.85">
 
             <Button
-                android:id="@+id/btn_mem_plus"
-                android:text="M+"
-                style="@style/CalcSimpleButton.Secondary" />
+                android:id="@+id/btn_reciprocal"
+                android:text="1/x"
+                style="@style/CalcSimpleButton.Function" />
             <Button
-                android:id="@+id/btn_mem_minus"
-                android:text="M−"
-                style="@style/CalcSimpleButton.Secondary" />
+                android:id="@+id/btn_square"
+                android:text="x²"
+                style="@style/CalcSimpleButton.Function" />
             <Button
-                android:id="@+id/btn_mem_clear"
-                android:text="MC"
-                style="@style/CalcSimpleButton.Secondary" />
+                android:id="@+id/btn_cube"
+                android:text="x³"
+                style="@style/CalcSimpleButton.Function" />
             <Button
-                android:id="@+id/btn_mem_save"
-                android:text="MS"
-                style="@style/CalcSimpleButton.Secondary" />
+                android:id="@+id/btn_power"
+                android:text="xʸ"
+                style="@style/CalcSimpleButton.Function" />
             <Button
-                android:id="@+id/btn_mem_recall"
-                android:text="MR"
-                style="@style/CalcSimpleButton.Secondary" />
+                android:id="@+id/btn_neg_one"
+                android:text="x⁻¹"
+                style="@style/CalcSimpleButton.Function" />
         </TableRow>
 
         <!-- Row 2: a/b , a b/c , √x , ( , ) -->
@@ -117,48 +117,12 @@
                 style="@style/CalcSimpleButton.Function" />
         </TableRow>
 
-        <!-- Row 2b: % (moved here to make room for a b/c above) + vertical cursor
-             navigation ▲ / ▼ (Qg up/down), aligned above ◀ / ▶ -->
-        <TableRow
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="0.6">
-
-            <Button
-                android:id="@+id/btn_percent"
-                android:layout_column="2"
-                android:text="%"
-                style="@style/CalcSimpleButton.Function" />
-            <Button
-                android:id="@+id/btn_cursor_up"
-                android:layout_column="3"
-                android:text="▲"
-                style="@style/CalcSimpleButton.Function" />
-            <Button
-                android:id="@+id/btn_cursor_down"
-                android:layout_column="4"
-                android:text="▼"
-                style="@style/CalcSimpleButton.Function" />
-        </TableRow>
-
-        <!-- Row 3: 1/x , x² , y^x , ◀ , ▶ -->
+        <!-- Row 3: cursor navigation ◀ ▶ ▲ ▼ + % -->
         <TableRow
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="0.85">
 
-            <Button
-                android:id="@+id/btn_reciprocal"
-                android:text="1/x"
-                style="@style/CalcSimpleButton.Function" />
-            <Button
-                android:id="@+id/btn_square"
-                android:text="x²"
-                style="@style/CalcSimpleButton.Function" />
-            <Button
-                android:id="@+id/btn_power"
-                android:text="xʸ"
-                style="@style/CalcSimpleButton.Function" />
             <Button
                 android:id="@+id/btn_cursor_left"
                 android:text="◀"
@@ -166,6 +130,18 @@
             <Button
                 android:id="@+id/btn_cursor_right"
                 android:text="▶"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_cursor_up"
+                android:text="▲"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_cursor_down"
+                android:text="▼"
+                style="@style/CalcSimpleButton.Function" />
+            <Button
+                android:id="@+id/btn_percent"
+                android:text="%"
                 style="@style/CalcSimpleButton.Function" />
         </TableRow>
 
