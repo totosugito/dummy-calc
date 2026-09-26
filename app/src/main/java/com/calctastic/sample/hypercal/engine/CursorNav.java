@@ -9,6 +9,7 @@ import com.calctastic.sample.hypercal.engine.model.OperatorNode;
 import com.calctastic.sample.hypercal.engine.model.ParenthesisNode;
 import com.calctastic.sample.hypercal.engine.model.PowerNode;
 import com.calctastic.sample.hypercal.engine.model.SequenceNode;
+import com.calctastic.sample.hypercal.engine.model.SqrtNode;
 
 /**
  * Everything about "where the cursor goes": the ◀/▶ arrow-key entry points ({@link #moveLeft},
@@ -70,19 +71,17 @@ public final class CursorNav {
     }
 
     /**
-     * Generic version of {@link #startOf(SequenceNode)}/{@link #endOf(SequenceNode)} for a slot
-     * that might be a SequenceNode (fraction numerator/denominator) or a single node directly
-     * (PowerNode base/exponent, ParenthesisNode content -- these are plain NumberNode/
-     * ParenthesisNode, not SequenceNode-wrapped, so there's no "first child" to step into).
+     * True when {@code seq} is an editable slot owned by some wrapper node (fraction, power,
+     * sqrt, parenthesis) -- see specs/editable_slots_sequencenode.md. Such a slot must never be
+     * left with zero children: emptying it out should refill it with a single EmptyNode
+     * placeholder instead, the same way a fraction's numerator/denominator already do. This is
+     * false for a "plain" sequence that isn't anyone's slot (e.g. the expression root), which is
+     * allowed to genuinely have zero children.
      */
-    public static CursorPointer startOfNode(ExpressionNode node) {
-        if (node instanceof SequenceNode) return startOf((SequenceNode) node);
-        return new CursorPointer(node, 0);
-    }
-
-    public static CursorPointer endOfNode(ExpressionNode node) {
-        if (node instanceof SequenceNode) return endOf((SequenceNode) node);
-        return afterNode(node);
+    public static boolean isWrapperSlot(SequenceNode seq) {
+        ExpressionNode owner = seq.getParent();
+        return owner instanceof FractionNode || owner instanceof PowerNode
+                || owner instanceof SqrtNode || owner instanceof ParenthesisNode;
     }
 
     /**
@@ -125,27 +124,20 @@ public final class CursorNav {
 
         // Center after power (xʸ/x²/x³/x⁻¹): step left into the end of the exponent
         if (node instanceof PowerNode && cursorPointer.position == 1) {
-            return endOfNode(((PowerNode) node).exponent);
+            return endOf(((PowerNode) node).exponent);
         }
 
         // Center after parenthesis: step left into the end of its content
         if (node instanceof ParenthesisNode && cursorPointer.position == 1) {
-            return endOfNode(((ParenthesisNode) node).content);
+            return endOf(((ParenthesisNode) node).content);
+        }
+
+        // Center after sqrt: step left into the end of the radicand
+        if (node instanceof SqrtNode && cursorPointer.position == 1) {
+            return endOf(((SqrtNode) node).radicand);
         }
 
         ExpressionNode parent = node.getParent();
-
-        // Leaving a power's exponent -> end of base; leaving the base -> Center before power
-        if (parent instanceof PowerNode) {
-            PowerNode pow = (PowerNode) parent;
-            return node == pow.exponent ? endOfNode(pow.base) : new CursorPointer(pow, 0);
-        }
-
-        // Leaving parenthesis content -> Center before the parenthesis
-        if (parent instanceof ParenthesisNode) {
-            return new CursorPointer(parent, 0);
-        }
-
         if (!(parent instanceof SequenceNode)) return cursorPointer;
         SequenceNode seq = (SequenceNode) parent;
         int idx = seq.getChildIndex(node);
@@ -164,7 +156,10 @@ public final class CursorNav {
             return afterNode(prev);
         }
 
-        // At the start of a fraction slot
+        // At the start of a slot (fraction/power/sqrt/parenthesis): step out to the sibling
+        // slot, or to Center just before the whole wrapper node -- see
+        // specs/editable_slots_sequencenode.md, this is the same shape for every slot type
+        // now that they're all SequenceNode.
         FractionNode frac = fractionOfSlot(seq);
         if (frac != null) {
             if (seq == frac.denominator) {
@@ -174,6 +169,19 @@ public final class CursorNav {
             } else {
                 return new CursorPointer(frac, 0); // Center before fraction
             }
+        }
+        ExpressionNode owner = seq.getParent();
+        if (owner instanceof PowerNode) {
+            PowerNode pow = (PowerNode) owner;
+            return seq == pow.exponent ? endOf(pow.base) : new CursorPointer(pow, 0);
+        }
+        if (owner instanceof ParenthesisNode) {
+            return new CursorPointer(owner, 0); // Center before parenthesis
+        }
+        if (owner instanceof SqrtNode) {
+            SqrtNode sqrt = (SqrtNode) owner;
+            return (seq == sqrt.radicand && sqrt.degree != null)
+                    ? endOf(sqrt.degree) : new CursorPointer(sqrt, 0);
         }
         return cursorPointer;
     }
@@ -197,27 +205,21 @@ public final class CursorNav {
 
         // Center before power: step right into the start of the base
         if (node instanceof PowerNode && cursorPointer.position == 0) {
-            return startOfNode(((PowerNode) node).base);
+            return startOf(((PowerNode) node).base);
         }
 
         // Center before parenthesis: step right into the start of its content
         if (node instanceof ParenthesisNode && cursorPointer.position == 0) {
-            return startOfNode(((ParenthesisNode) node).content);
+            return startOf(((ParenthesisNode) node).content);
+        }
+
+        // Center before sqrt: step right into the start of the degree (if any) or radicand
+        if (node instanceof SqrtNode && cursorPointer.position == 0) {
+            SqrtNode sqrt = (SqrtNode) node;
+            return startOf(sqrt.degree != null ? sqrt.degree : sqrt.radicand);
         }
 
         ExpressionNode parent = node.getParent();
-
-        // Leaving a power's base -> start of exponent; leaving the exponent -> Center after power
-        if (parent instanceof PowerNode) {
-            PowerNode pow = (PowerNode) parent;
-            return node == pow.base ? startOfNode(pow.exponent) : new CursorPointer(pow, 1);
-        }
-
-        // Leaving parenthesis content -> Center after the parenthesis
-        if (parent instanceof ParenthesisNode) {
-            return new CursorPointer(parent, 1);
-        }
-
         if (!(parent instanceof SequenceNode)) return cursorPointer;
         SequenceNode seq = (SequenceNode) parent;
         int idx = seq.getChildIndex(node);
@@ -235,7 +237,9 @@ public final class CursorNav {
             return enterFromLeft(next);
         }
 
-        // At the end of a fraction slot
+        // At the end of a slot (fraction/power/sqrt/parenthesis): step out to the sibling
+        // slot, or to Center just after the whole wrapper node -- mirror of moveLeft's
+        // "start of a slot" handling above.
         FractionNode frac = fractionOfSlot(seq);
         if (frac != null) {
             if (seq == frac.integerPart) {
@@ -245,6 +249,18 @@ public final class CursorNav {
             } else {
                 return new CursorPointer(frac, 1); // Center after fraction
             }
+        }
+        ExpressionNode owner = seq.getParent();
+        if (owner instanceof PowerNode) {
+            PowerNode pow = (PowerNode) owner;
+            return seq == pow.base ? startOf(pow.exponent) : new CursorPointer(pow, 1);
+        }
+        if (owner instanceof ParenthesisNode) {
+            return new CursorPointer(owner, 1);
+        }
+        if (owner instanceof SqrtNode) {
+            SqrtNode sqrt = (SqrtNode) owner;
+            return seq == sqrt.degree ? startOf(sqrt.radicand) : new CursorPointer(sqrt, 1);
         }
         return cursorPointer;
     }

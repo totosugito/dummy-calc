@@ -249,3 +249,46 @@ The render decoration mechanism in `PowerVisual` (Section I) was left unchanged 
 automatically stops drawing parentheses because `needsParenthesesForBase()` returns `false` for an
 empty base/plain number, as before. Re-tested: an empty `xʸ` is now `^{}` (not `()^{}`), `5` → `xʸ`
 → `3` is now `5^{3}` (not `(5)^{3}`); x²/x³/fractions/1x/combinations all still correct.
+
+## K. Bug found & fixed (2026-09-26): operator lifted as the base — "5 + xʸ" → "5(+)^{}"
+
+Found while checking that `xʸ` can now be nested inside another `xʸ`'s exponent (see
+`specs/editable_slots_sequencenode.md` for that unrelated refactor): `5 + xʸ` (an operand, an
+operator, then the general-power button) produced `5(+)^{}` instead of the expected `5 + ^{}`
+(empty base+exponent — there's nothing before the cursor to lift, since the cursor sits right on
+the `+` that was just typed).
+
+**Root cause:** `PowerInserter.insertPowerNode()` (shared by `xʸ`/`x²`/`x³`/`x⁻¹`) decided what to
+lift as the base with a weak check — `!(cursorPointer.node instanceof SequenceNode)` — which
+doesn't exclude the cursor sitting directly on an operator. `ExpressionEditor.appendOperator()`
+sets the cursor to `CursorPointer(op, 1)` right after inserting `+`, so this check let the `+`
+`OperatorNode` itself get treated as a liftable base. `PowerNode.needsParenthesesForBase()` then
+parenthesizes any bare `OperatorNode` base, producing the `(+)` seen in the output.
+
+`FractionInserter` (`a/b`, `a b/c`, `1/x`) never had this bug because all three of its methods
+already used the shared `CursorNav.hasOperandBeforeCursor()` helper, which explicitly excludes
+`EmptyNode`/`OperatorNode`/`SequenceNode` and requires the cursor to be positioned *after*
+something. `PowerInserter` had just never been switched over to using it — a leftover from before
+that helper existed, not something introduced by any of the sections above.
+
+There was also a second, redundant path to the same bug: a fallback branch
+(`rootSequence.getChildCount() > 0 && !(lastChild instanceof SequenceNode)`) meant for the
+"`cursorPointer.node` is the (empty) root sequence itself" case (e.g. right after
+`ExpressionEditor#reset()`), but written to ignore cursor position entirely — so it re-grabbed the
+same trailing `+` as a fallback "base" even after the primary check was fixed. It was dead code for
+its actual intended case anyway (`cursorPointer.node == rootSequence` only happens when
+`rootSequence` is empty, so `getChildCount() > 0` never held there), so it was removed rather than
+fixed.
+
+**Fix:** `PowerInserter.insertPowerNode()` now uses `CursorNav.hasOperandBeforeCursor(cursorPointer)`
+for the base-selection check, matching `FractionInserter`; the redundant fallback branch was
+deleted.
+
+**Verified on emulator** (LaTeX-dump technique, see `specs/testing_via_latex.md`):
+- `5 + xʸ` → `5 + ^{}` (fixed; was `5 + (+)^{}`)
+- `5` → `xʸ` → `3` → `5^{3}` (operand-lift still works)
+- `2 + x²` → `2 + ^{2}`, `2 + 1/x` → `2 + \frac{1}{}`, `2 + a/b` → `2 + \frac{\square}{\square}`
+  (no regressions in the sibling buttons that already used `hasOperandBeforeCursor` correctly)
+- `5` → `xʸ` → `xʸ` (pressed again with the cursor in the fresh empty exponent) → `5^{^{}}`,
+  confirming `xʸ` can now nest inside another `xʸ`'s exponent (the SequenceNode conversion in
+  `specs/editable_slots_sequencenode.md` working as intended at the model level).

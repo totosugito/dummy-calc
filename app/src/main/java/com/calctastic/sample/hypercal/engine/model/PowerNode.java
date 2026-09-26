@@ -4,14 +4,14 @@ package com.calctastic.sample.hypercal.engine.model;
  * Power/Superscript expression node (e.g. x^y, x^2).
  * Faithful to HiPER Calc C0067Lb with EnumC0300sa.Ca / Mc / K / qB / WB / T.
  *
- * Contains complete method structure:
- * - base and exponent child references with parent hierarchy
- * - navigation, cloning, and type checking
- * - needsParenthesesForBase() 100% faithful to C0067Lb.E$1(null)
+ * base/exponent are SequenceNode slots (HiPER GA inside C0067Lb), matching FractionNode's
+ * numerator/denominator -- see specs/editable_slots_sequencenode.md. This lets any expression
+ * (including a nested fraction or another power) be inserted into either slot through the same
+ * insert/nav/delete paths used everywhere else, instead of needing slot-specific handling.
  */
 public class PowerNode extends ExpressionNode {
-    public ExpressionNode base;
-    public ExpressionNode exponent;
+    public SequenceNode base;
+    public SequenceNode exponent;
     public String operationName; // "xʸ", "x²", "x³", "x⁻¹", etc.
     public boolean isClosed = true;
 
@@ -20,33 +20,43 @@ public class PowerNode extends ExpressionNode {
     }
 
     public PowerNode(ExpressionNode base, ExpressionNode exponent, String operationName) {
-        this.base = base;
-        if (base != null) {
-            base.setParent(this);
-        }
-        this.exponent = exponent;
-        if (exponent != null) {
-            exponent.setParent(this);
-        }
+        this.base = toSlot(base);
+        this.base.setParent(this);
+        this.exponent = toSlot(exponent);
+        this.exponent.setParent(this);
         this.operationName = operationName != null ? operationName : "xʸ";
     }
 
-    public ExpressionNode getBase() {
+    /** Wraps a bare node into a SequenceNode slot (an empty slot holds a single EmptyNode). */
+    private static SequenceNode toSlot(ExpressionNode node) {
+        if (node instanceof SequenceNode) {
+            SequenceNode seq = (SequenceNode) node;
+            if (seq.getChildCount() == 0) {
+                seq.add(new EmptyNode());
+            }
+            return seq;
+        }
+        SequenceNode seq = new SequenceNode();
+        seq.add(node != null ? node : new EmptyNode());
+        return seq;
+    }
+
+    public SequenceNode getBase() {
         return base;
     }
 
-    public void setBase(ExpressionNode base) {
+    public void setBase(SequenceNode base) {
         this.base = base;
         if (base != null) {
             base.setParent(this);
         }
     }
 
-    public ExpressionNode getExponent() {
+    public SequenceNode getExponent() {
         return exponent;
     }
 
-    public void setExponent(ExpressionNode exponent) {
+    public void setExponent(SequenceNode exponent) {
         this.exponent = exponent;
         if (exponent != null) {
             exponent.setParent(this);
@@ -57,24 +67,26 @@ public class PowerNode extends ExpressionNode {
      * Exact parenthesis requirement logic for base of power from C0067Lb.java E$1(ZB zb).
      * If base is negative, or is an operator sequence / binary expression without parens,
      * base must be enclosed in parentheses when elevated to a power (e.g. (-5)^2).
+     *
+     * base is now always a SequenceNode slot, so this looks at the slot's content: more than
+     * one token means a compound expression (needs parens), a single negative number or a bare
+     * operator token also needs parens, anything else (including an empty/placeholder slot)
+     * doesn't.
      */
     public boolean needsParenthesesForBase() {
-        if (base == null) {
+        if (base == null || base.getChildCount() == 0) {
             return false;
         }
-        if (base instanceof NumberNode) {
-            // Negative number needs parens e.g. (-2)^x
-            return ((NumberNode) base).isNegative();
-        }
-        if (base instanceof SequenceNode) {
-            SequenceNode seq = (SequenceNode) base;
+        if (base.getChildCount() > 1) {
             // Compound expression with multiple terms needs parens e.g. (a + b)^2
-            return seq.getChildCount() > 1;
-        }
-        if (base instanceof OperatorNode) {
             return true;
         }
-        return false;
+        ExpressionNode only = base.getChild(0);
+        if (only instanceof NumberNode) {
+            // Negative number needs parens e.g. (-2)^x
+            return ((NumberNode) only).isNegative();
+        }
+        return only instanceof OperatorNode;
     }
 
     @Override

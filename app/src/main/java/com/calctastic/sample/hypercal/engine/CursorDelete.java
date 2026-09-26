@@ -5,7 +5,10 @@ import com.calctastic.sample.hypercal.engine.model.EmptyNode;
 import com.calctastic.sample.hypercal.engine.model.ExpressionNode;
 import com.calctastic.sample.hypercal.engine.model.FractionNode;
 import com.calctastic.sample.hypercal.engine.model.NumberNode;
+import com.calctastic.sample.hypercal.engine.model.ParenthesisNode;
+import com.calctastic.sample.hypercal.engine.model.PowerNode;
 import com.calctastic.sample.hypercal.engine.model.SequenceNode;
+import com.calctastic.sample.hypercal.engine.model.SqrtNode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +61,18 @@ public final class CursorDelete {
         if (node instanceof EmptyNode) {
             FractionNode frac = CursorNav.fractionOfSlot(node.getParent());
             if (frac == null) {
+                // An EmptyNode can also end up as the sole content of a power/sqrt/parenthesis
+                // slot (refilled by removeFromSequence once a number is deleted down to
+                // nothing there -- see specs/editable_slots_sequencenode.md). DEL there should
+                // remove the whole wrapper, same as DEL on an empty NumberNode slot does.
+                if (node.getParent() instanceof SequenceNode) {
+                    SequenceNode slot = (SequenceNode) node.getParent();
+                    ExpressionNode owner = slot.getParent();
+                    if (slot.getChildCount() == 1
+                            && (owner instanceof SqrtNode || owner instanceof ParenthesisNode || owner instanceof PowerNode)) {
+                        return removeFromSequence(owner, cursorPointer);
+                    }
+                }
                 return removeFromSequence(node, cursorPointer);
             } else if (node.getParent() == frac.denominator) {
                 // DEL in empty denominator jumps to the end of the numerator
@@ -93,17 +108,28 @@ public final class CursorDelete {
             NumberNode num = (NumberNode) node;
             if (num.deleteChar()) {
                 if (num.getLength() == 0 && num.getParent() instanceof SequenceNode) {
-                    // Number emptied: drop it (a fraction slot gets its EmptyNode back)
+                    // Number emptied: drop it (a fraction/power/sqrt/parenthesis slot gets its
+                    // EmptyNode placeholder back, see removeFromSequence)
                     return removeFromSequence(num, cursorPointer);
                 }
                 return new CursorPointer(num, num.cursorPosition);
             }
+            // Empty number that is the sole content of a power/sqrt/parenthesis slot: DEL
+            // removes the whole wrapper (there's nothing left inside it to delete). This must
+            // be checked BEFORE the generic "parent is a SequenceNode" case below, since with
+            // slots now always SequenceNode-wrapped (see specs/editable_slots_sequencenode.md)
+            // that check alone can no longer tell "genuinely empty box" apart from "an empty
+            // number with other tokens before it in the same slot".
+            if (num.getLength() == 0 && num.getParent() instanceof SequenceNode) {
+                SequenceNode slot = (SequenceNode) num.getParent();
+                ExpressionNode owner = slot.getParent();
+                if (slot.getChildCount() == 1
+                        && (owner instanceof SqrtNode || owner instanceof ParenthesisNode || owner instanceof PowerNode)) {
+                    return removeFromSequence(owner, cursorPointer);
+                }
+            }
             if (num.getLength() > 0 || num.getParent() instanceof SequenceNode) {
                 return deleteBefore(num, cursorPointer);
-            }
-            // Empty number inside sqrt/parenthesis/power: remove the wrapper
-            if (num.getParent() != null) {
-                return removeFromSequence(num.getParent(), cursorPointer);
             }
             return cursorPointer;
         }
@@ -127,7 +153,12 @@ public final class CursorDelete {
         int idx = seq.getChildIndex(node);
         seq.removeChild(node);
         if (seq.getChildCount() == 0) {
-            if (CursorNav.fractionOfSlot(seq) != null) {
+            // A slot owned by a wrapper node (fraction/power/sqrt/parenthesis) must never sit
+            // at zero children -- refill it with an EmptyNode placeholder, same as a fraction's
+            // numerator/denominator already did before this became generic (see
+            // specs/editable_slots_sequencenode.md). A "plain" sequence that isn't anyone's
+            // slot (e.g. the expression root) is allowed to genuinely end up empty.
+            if (CursorNav.isWrapperSlot(seq)) {
                 EmptyNode empty = new EmptyNode();
                 seq.add(empty);
                 return new CursorPointer(empty, 0);

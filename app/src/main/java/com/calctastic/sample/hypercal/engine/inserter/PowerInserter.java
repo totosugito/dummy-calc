@@ -64,19 +64,25 @@ public final class PowerInserter {
      */
     private static CursorPointer insertPowerNode(SequenceNode rootSequence, CursorPointer cursorPointer,
             String exponentText, String symbol, boolean cursorInExponent) {
-        // cursorPointer.node can itself be a SequenceNode (e.g. a fresh/emptied expression, see
-        // ExpressionEditor#reset()) -- that must NOT be used as the base: PowerNode's constructor
-        // would reassign the sequence's own parent to the new PowerNode, which then gets added as
-        // a child of that very same sequence, creating a base<->child cycle (confirmed via a
-        // StackOverflowError in toLatexString when this shipped without the check below).
-        ExpressionNode targetBase = null;
-        if (cursorPointer != null && cursorPointer.node != null
-                && !(cursorPointer.node instanceof SequenceNode)) {
-            targetBase = cursorPointer.node;
-        } else if (rootSequence.getChildCount() > 0
-                && !(rootSequence.getChild(rootSequence.getChildCount() - 1) instanceof SequenceNode)) {
-            targetBase = rootSequence.getChild(rootSequence.getChildCount() - 1);
-        }
+        // Use the same "is there really an operand to lift" check as the fraction family
+        // (hasOperandBeforeCursor): it excludes EmptyNode/OperatorNode/SequenceNode and requires
+        // position > 0. Without this, the old plain "!(cursorPointer.node instanceof
+        // SequenceNode)" check let the cursor sitting right on an operator (e.g. right after
+        // appendOperator sets CursorPointer(op, 1) for "5 +") get treated as a liftable base --
+        // wrapping the "+" itself into "5(+)^{}" instead of recognizing there is nothing to lift
+        // and falling through to the empty-base-and-exponent case below.
+        //
+        // There used to also be a "look at rootSequence's last child instead" fallback here for
+        // when cursorPointer.node is itself a SequenceNode (e.g. a fresh/emptied expression, see
+        // ExpressionEditor#reset()). That fallback was both dead for its intended case (cursor.node
+        // only ever equals rootSequence when rootSequence is empty, so "getChildCount() > 0" never
+        // held) and, worse, reachable for the operator case above too -- since it ignored cursor
+        // position and just grabbed rootSequence's last child unconditionally, re-triggering the
+        // exact "+"-as-base bug via a second path. Removed; hasOperandBeforeCursor(cursorPointer)
+        // being false is reason enough to fall through to the empty-base-and-exponent case below.
+        ExpressionNode targetBase = (cursorPointer != null && cursorPointer.node != null
+                && CursorNav.hasOperandBeforeCursor(cursorPointer))
+                ? cursorPointer.node : null;
 
         if (targetBase == null) {
             NumberNode baseNum = new NumberNode("");

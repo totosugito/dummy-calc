@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
 import com.calctastic.sample.R;
+import com.calctastic.sample.hypercal.engine.CursorNav;
 import com.calctastic.sample.hypercal.engine.ExpressionEditor;
 import com.calctastic.sample.hypercal.engine.model.CursorPointer;
 import com.calctastic.sample.hypercal.engine.model.FractionNode;
@@ -57,7 +58,7 @@ public class HyperCalActivity extends Activity implements View.OnClickListener {
         rootSequence.addChild(pow);
 
         // Put cursor in pow exponent
-        editor.setCursorPointer(new CursorPointer(pow.exponent, pow.exponent.getLength()));
+        editor.setCursorPointer(CursorNav.endOf(pow.exponent));
         displayView.setExpressionRoot(rootSequence);
         displayView.setCursorPointer(editor.getCursorPointer());
         updateFormulaText();

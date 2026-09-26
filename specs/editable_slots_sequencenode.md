@@ -61,10 +61,3 @@ nodes come next.
   per parent-node type.
 - Full regression needed every time this principle is applied to a new node: nesting across every
   expression kind, DEL/unwrap, left/right/up/down navigation, nested combinations.
-
-## Status
-
-**This principle applies going forward to every new node with an editable slot** (including the
-planned square-root feature). If any node currently doesn't follow this principle (its slot is
-still a plain `ExpressionNode`), that's considered a gap to fix for consistency, not a deliberate
-deviation.
