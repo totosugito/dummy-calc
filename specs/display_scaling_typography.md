@@ -104,9 +104,15 @@ $$\text{screenScale} = \text{mo352HiPER}() = \mathbf{Tg.HiPER(V.HiPER)}$$
   - `f3 = (-ascent) × 1.6`; `baseline = max(f3, root.m)`.
   - Jika bagian di bawah baseline (`root.b.y - root.m`) > `viewHeight - f3` → `baseline = max(root.m, viewHeight - below)`.
   - `startY = baseline - root.m` (menggantikan `(viewHeight - b.y) / 2`). Terverifikasi di emulator: ekspresi menempel di atas display.
-- [ ] **Task 7: Rumus skala `k() = Tg.HiPER(V) × D × G.HiPER`**, ukuran font `k() × 14` per visual. Sekarang `width / 276f` tanpa density; `REFERENCE_WIDTH_DP = 310` tidak terpakai; rasio `f_y` (landscape) belum ada. Samakan angka tabel (~89px) dengan Task 4 (54.8px).
+- [x] **Task 7: Rumus skala `k() = Tg.HiPER(V) × D × G.HiPER`**, ukuran font `k() × 14` per visual. Sekarang `width / 276f` tanpa density; `REFERENCE_WIDTH_DP = 310` tidak terpakai; rasio `f_y` (landscape) belum ada. Samakan angka tabel (~89px) dengan Task 4 (54.8px).
+  - **Temuan (C0332vh.java 797–811, Tg.java 367–395):** `Tg.HiPER(V.HiPER)` mengembalikan field `H` = skala **vertikal** `f2 = point.y / (pointF.y + M)`, dibatasi `f2 ≤ 1.2 × f` dengan `f = point.x / pointF.x`. `point` = seluruh area kalkulator (bukan hanya display). Nilai dimensi tema adalah unit desain mentah (tanpa density) → skala langsung menjadi px/unit.
+  - **Keypad referensi** (`C0341wd.mo344HiPER()` + tema `AbstractC0060Ig`): `x = max((4+47)×5, (5+59)×4) + 4 + 4 = 264`, `y = (4+26)×3 + (5+33)×5 + 0 + 4 + 1 = 285`, lalu `+2×"1"` → **266 × 287**.
+  - **M** (tinggi display referensi, `GestureDetectorOnGestureListenerC0122aI.G()`): `2×"95" + header + UF.d() (3.6 × lineH(14)) + baris hasil lineH(15) + lineH(8) + "95"`. Tinggi header (`m283HiPER`) diaproksimasi satu baris font 8 → nilai M adalah **perkiraan**.
+  - **Implementasi:** `HyperCalDisplayView.updatePaintSize()` memakai ukuran `android.R.id.content`. Di ponsel tinggi, batas `1.2 × f` yang menentukan, jadi M hampir tidak berpengaruh.
+  - **Hasil emulator 1080×2424 @420dpi:** `1.2 × 1080/266 × 14 ≈ 68.2 px` (sebelumnya 54.8 px). Klaim "88–92 px" di Bagian 3 tidak sesuai kode asli.
+  - Asumsi yang belum terbukti: kelas keypad aktif adalah `C0341wd` (bukan `BD`/`C0081Pe`/`C0271pD`), cabang `Tk.xa = false`, dan mode bukan `EnumC0051Ha.c`.
 - [ ] **Task 8: Paint per visual via `k$1()`**: typeface + style dari `C0215jD`, warna dari tema key `"86"`. Hilangkan hardcode `0xFFFFFFFF` (teks) & `0xFF2196F3` (kursor).
 - [ ] **Task 9: Hapus clamp lebar kursor** `Math.max(3.0f, …)` / `Math.max(2.0f, …)`.
 - [ ] **Task 10: Scroll, clip & wrap multi-baris** (`UF.java` baris 436–440, 638): `canvas.clipRect` dengan offset `B`, batas lebar `G.m` untuk wrap.
-- [ ] **Task 11: Bersihkan Javadoc usang** di `HyperCalDisplayView` (masih menyebut `22sp`, `R.font.math_symbols`).
+- [x] **Task 11: Bersihkan Javadoc usang** di `HyperCalDisplayView` (masih menyebut `22sp`, `R.font.math_symbols`).
 - [ ] **Task 12: Pastikan string ukur `HcZgWQ.LiVE`** pada `AbstractC0335wD.HiPER(paint, f)` memang `" "` (diisi saat runtime).

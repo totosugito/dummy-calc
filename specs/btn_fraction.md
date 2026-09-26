@@ -214,7 +214,7 @@ Hasil perbandingan ulang `Qg.java`, `C0357yG.java`, `QA.java`, `AbstractC0335wD.
 
 ### C. Urutan Prioritas Pengerjaan
 1. ~~**Perilaku (langsung terasa pengguna):** Task 20 → Task 19 → Task 12 → verifikasi tap kiri/kanan pecahan (sisa Task 5).~~ ✅ selesai 2026-09-26
-2. **Skala display:** `display_scaling_typography.md` Task 7.
+2. ~~**Skala display:** `display_scaling_typography.md` Task 7.~~ ✅ selesai 2026-09-26
 3. **Akurasi render:** Task 13 → Task 17 → Task 11 → Task 16 (+ display Task 9).
 4. **Warna tema:** Task 15 (+ display Task 8).
 5. **Fitur tambahan:** Task 10 → Task 14 (+ display Task 10).
