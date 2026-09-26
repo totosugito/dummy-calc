@@ -586,14 +586,58 @@ extends it — e.g. continuing to type more digits into a preceding number).
 type a digit → `2 + 3`. Screenshot confirms the cursor caret renders immediately to the right of
 `+`.
 
-### L. Known remaining inconsistency (not fixed, flagged 2026-09-26)
+### L. Bug found & fixed (2026-09-26): DEL before a power was a dead keystroke, or deleted the whole power instead of what precedes it
 
-`CursorDelete.deleteChar()` has no position-aware dispatch at all for `PowerNode`, `SqrtNode`, or
-`ParenthesisNode` — a cursor sitting directly on one of these nodes at EITHER boundary position (0
-or 1) falls through to the same "delete the whole node" fallback. Fraction is the only one of the
-four compound types that distinguishes: position 0 → `deleteBefore` (delete whatever precedes it,
-correct standard backspace semantics), position 1 → delete the whole node (Section J). For
-power/sqrt/parenthesis, DEL at position 0 (cursor to the LEFT of the node, about to delete whatever
-is behind it) currently also deletes the whole node instead of the token that actually precedes it
-— inconsistent with fraction, and arguably wrong by the same "delete what's behind the cursor"
-standard this section just used to justify Section J. Not fixed yet — flagged for a future task.
+Flagged originally as "not yet fixed" right after Section J landed; user asked to test it and it
+turned out to be two separate, related bugs rather than one, both now fixed.
+
+**Symptom.** Build `2 + x^y` (base `5`, exponent `3`) so the debug LaTeX reads `2 + 5^{3}`. Move the
+cursor left, out of the exponent and up to just after the `+` (three ◀ presses from the end of the
+exponent — the cursor visually sits at `2 + |5^{3}`). Press DEL.
+
+- **Before this fix:** nothing happened at all — a dead keystroke, the same class of bug as
+  `specs/operator_cursor_nav.md`. One more ◀ press (four total, landing the cursor exactly on the
+  power's own Center-before boundary) instead made DEL delete the *entire* `5^{3}`, even though the
+  cursor was to its LEFT and nothing about "delete what precedes the cursor" should touch it.
+- **After this fix:** DEL at either of those two cursor states now correctly deletes the `+`,
+  leaving `2 5^{3}` — the power is untouched, exactly like Section J's "delete what's behind the
+  cursor" standard demands.
+
+**Root cause, case 1 (dead keystroke at three ◀ presses).** At this point the cursor is not
+actually resting on the `PowerNode` at all — `CursorNav.moveLeft` handles left-arrow movement
+character-by-character inside `NumberNode` first, so three ◀ presses land the cursor at position 0
+*inside* the base's own `NumberNode("5")`. `CursorDelete.deleteChar()` dispatches that to
+`deleteBefore(num, cursorPointer)`, which only looks at siblings within `num`'s immediate parent —
+the power's base slot, which contains nothing but `"5"` itself. Finding no previous sibling there
+(`idx <= 0`), it gave up and returned the cursor unchanged, never realizing it should walk up past
+the power wrapper to the outer sequence where the `+` actually lives.
+
+Fixed by adding an escalation step to `deleteBefore`: when `idx <= 0`, check whether the current
+slot is the *leading* slot of a wrapper (fraction numerator/integer-part, power base, sqrt
+degree-or-radicand, parenthesis content — the same shape `CursorNav.moveLeft`'s own "at start of a
+slot" logic already recognizes) and, if so, retry `deleteBefore` against the wrapper node itself,
+which does sit in the outer sequence. New private helper `CursorDelete.leadingSlotOwner(SequenceNode)`.
+This is a general fix, not power-specific — it applies uniformly to all four wrapper types (fraction
+included, though fraction's numerator-start case wasn't separately reported as buggy).
+
+**Root cause, case 2 (whole-power delete at four ◀ presses).** A fourth ◀ press, from position 0
+inside the base's `NumberNode`, escapes the base slot entirely and produces a genuine
+`CursorPointer(pow, 0)` — cursor literally resting on the `PowerNode`, Center-before position (the
+same shape Fraction's `CursorPointer(frac, 0)` already has explicit handling for). But
+`CursorDelete.deleteChar()` had no `instanceof PowerNode` branch at all, unlike `FractionNode` —
+so a `PowerNode` cursor at EITHER boundary position (0 or 1) fell through to the same generic
+`removeFromSequence(node, cursorPointer)` fallback, silently deleting the whole power regardless of
+which side of it the cursor was actually on.
+
+Fixed by adding a `PowerNode` branch to `deleteChar`, mirroring `FractionNode`'s own: position 0 →
+`deleteBefore(pow, cursorPointer)` (delete whatever precedes the power), position 1 →
+`removeFromSequence(pow, cursorPointer)` (delete the whole power, per Section J). Sqrt and
+Parenthesis deliberately did NOT get this same explicit dispatch — those buttons aren't a finished
+feature yet, so their identical latent inconsistency (a position-0 cursor on the wrapper node itself
+would still delete the whole node) is left as-is for now, not a currently tracked bug.
+
+**Verified on-device** (LaTeX dump + screenshot, see `specs/testing_via_latex.md`):
+`2 + 5^{3}` → 3×◀ → DEL → `2 5^{3}` (cursor lands between `2` and `5^{3}`); same expression → 4×◀ →
+DEL → `2 5^{3}` (identical, now consistent); `5^{3}` → ▶ (out of exponent, to Center-after) → DEL →
+empty (whole-power delete still correct, unaffected); plain `2 + 3` → DEL → `2 + ` (ordinary digit
+delete, unaffected).

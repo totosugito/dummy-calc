@@ -358,12 +358,19 @@ given fraction's old unwrap behavior — see `btn_fraction.md` Section J for the
 the cursor to be positioned explicitly inside first). So `5 → x² → DEL` deleting everything is now
 the deliberate, intended behavior, consistent with fraction — not a gap.
 
-Still true and still unfixed: `CursorDelete` has no position-aware handling for `PowerNode` at all,
-meaning DEL at Center-BEFORE a power (position 0, cursor to its left) *also* deletes the whole power
-instead of whatever token actually precedes it — inconsistent with fraction, which correctly
-distinguishes position 0 (delete the preceding token) from position 1 (delete the whole fraction).
-See `btn_fraction.md` Section L for this flagged-but-not-yet-fixed inconsistency (applies to
-`SqrtNode`/`ParenthesisNode` too).
+**UPDATE 2026-09-26, see `btn_fraction.md` Section L — this is now fixed too:** the asymmetry noted
+just above (`CursorDelete` had no position-aware handling for `PowerNode`, so DEL at Center-BEFORE a
+power also deleted the whole power instead of the token that actually precedes it) has been fixed.
+`CursorDelete.deleteChar()` now has an explicit `PowerNode` branch mirroring `FractionNode`'s:
+position 0 → `deleteBefore(pow, ...)`, position 1 → delete the whole power (unchanged, per Section J
+above). A related dead-keystroke bug was found and fixed at the same time: DEL with the cursor
+resting *inside* the base's own `NumberNode` at position 0 (one ◀ press short of the power's own
+Center-before boundary) did nothing at all, because `deleteBefore` only checked for a previous
+sibling within the base slot itself and never walked up to the outer sequence. Fixed via a new
+`CursorDelete.leadingSlotOwner()` escalation, which is not power-specific — it fixes the same shape
+of bug for fraction/sqrt/parenthesis leading slots too. Sqrt and Parenthesis still don't get power's
+new explicit `deleteChar` dispatch (deliberately, since those buttons aren't a finished feature yet)
+— see `btn_fraction.md` Section L for the full fix writeup and on-device verification.
 
 ## M. Fix (2026-09-26): empty exponent/base box too large compared to an actual digit
 

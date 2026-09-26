@@ -51,11 +51,28 @@ public class ExpressionEditor {
     }
 
     public void setCursorPointer(CursorPointer pointer) {
-        this.cursorPointer = pointer;
+        setCursor(pointer);
     }
 
+    /**
+     * Every cursor change goes through here so {@code pointer.node}'s own
+     * {@code cursorPosition} field (used internally by {@link NumberNode#insertChar} and
+     * {@link NumberNode#deleteChar}) is always kept in sync with the {@link CursorPointer}
+     * wrapper. This used to happen only as a side effect of
+     * {@code HyperCalDisplayView#setCursorPointer} syncing it on every redraw -- which worked in
+     * the app (a redraw happens between any two button presses) but meant this class silently
+     * depended on the View layer for its own internal consistency, despite the class-level doc
+     * comment's claim of having no Android dependency. Surfaced 2026-09-26 by
+     * {@code CursorRegressionTest}, a plain-JUnit test suite exercising this class headlessly
+     * (see specs/testing_via_latex.md) -- {@code moveCursorLeft()} into a NumberNode followed
+     * immediately by {@code deleteChar()}, with no redraw in between, deleted the wrong character
+     * because the node's stale {@code cursorPosition} hadn't been updated yet.
+     */
     private void setCursor(CursorPointer pointer) {
         this.cursorPointer = pointer;
+        if (pointer != null && pointer.node != null) {
+            pointer.node.setCursorPosition(pointer.position);
+        }
     }
 
     public void reset() {

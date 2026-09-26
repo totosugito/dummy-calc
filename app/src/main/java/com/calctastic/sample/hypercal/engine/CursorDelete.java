@@ -56,6 +56,25 @@ public final class CursorDelete {
             return deleteBefore(frac, cursorPointer);
         }
 
+        // Center slot before/after a power (xʸ/x²/x³/x⁻¹). Sqrt/Parenthesis don't get this
+        // explicit dispatch yet -- deliberately left on the generic "delete whole node" fallback
+        // below, see specs/btn_fraction.md Section L.
+        if (node instanceof PowerNode) {
+            PowerNode pow = (PowerNode) node;
+            if (cursorPointer.position == 0) {
+                // Center before the power: DEL deletes whatever precedes the WHOLE power in the
+                // outer sequence, not the power itself -- e.g. "2 + |5^{3}" (cursor resting
+                // directly on the power's own Center-before boundary, reached once the base's
+                // own content is also at position 0) should delete the "+", leaving "2 5^{3}".
+                // Previously this fell through to the same "delete whole node" fallback used for
+                // Center-after, silently eating the power itself no matter which side the cursor
+                // was actually on (found and fixed 2026-09-26, see specs/btn_fraction.md
+                // Section L).
+                return deleteBefore(pow, cursorPointer);
+            }
+            return removeFromSequence(pow, cursorPointer);
+        }
+
         // Empty placeholder box (QA)
         if (node instanceof EmptyNode) {
             FractionNode frac = CursorNav.fractionOfSlot(node.getParent());
@@ -213,6 +232,19 @@ public final class CursorDelete {
         SequenceNode seq = (SequenceNode) node.getParent();
         int idx = seq.getChildIndex(node);
         if (idx <= 0) {
+            // Cursor sits at the very start of a slot's own content (e.g. inside the base
+            // NumberNode of x^y, at position 0 -- moveLeft lands here character-by-character
+            // before any wrapper-boundary logic applies, see CursorNav#moveLeft). There is
+            // nothing before it INSIDE this slot, but if this is a wrapper's leading slot
+            // (base/degree-or-radicand/content/numerator), what should actually get deleted is
+            // whatever precedes the WHOLE wrapper in the outer sequence -- e.g. "2 + 5^{3}"
+            // with the cursor right after "+" (inside the base) should delete the "+", not do
+            // nothing. Retry against the wrapper node itself, which sits in that outer
+            // sequence. Without this, DEL there was a dead keystroke (2026-09-26).
+            ExpressionNode leadingOwner = leadingSlotOwner(seq);
+            if (leadingOwner != null) {
+                return deleteBefore(leadingOwner, fallback);
+            }
             return fallback;
         }
         ExpressionNode prev = seq.getChild(idx - 1);
@@ -231,5 +263,33 @@ public final class CursorDelete {
             seq.removeChild(prev);
         }
         return new CursorPointer(node, 0);
+    }
+
+    /**
+     * If {@code seq} is the leading slot of a fraction/power/sqrt/parenthesis wrapper (the one
+     * that sits right at the wrapper's own start -- numerator/integer-part, base, degree-or-else-
+     * radicand, or content), returns that wrapper node. Mirrors {@link CursorNav#moveLeft}'s own
+     * "at start of a slot" escalation, just for deletion instead of navigation.
+     */
+    private static ExpressionNode leadingSlotOwner(SequenceNode seq) {
+        FractionNode frac = CursorNav.fractionOfSlot(seq);
+        if (frac != null) {
+            boolean leading = seq == frac.numerator && !frac.isMixed()
+                    || (frac.isMixed() && seq == frac.integerPart);
+            return leading ? frac : null;
+        }
+        ExpressionNode owner = seq.getParent();
+        if (owner instanceof PowerNode) {
+            return seq == ((PowerNode) owner).base ? owner : null;
+        }
+        if (owner instanceof ParenthesisNode) {
+            return owner;
+        }
+        if (owner instanceof SqrtNode) {
+            SqrtNode sqrt = (SqrtNode) owner;
+            boolean leading = seq == (sqrt.degree != null ? sqrt.degree : sqrt.radicand);
+            return leading ? owner : null;
+        }
+        return null;
     }
 }

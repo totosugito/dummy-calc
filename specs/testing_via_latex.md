@@ -18,6 +18,49 @@ reliable way to verify behavior than taking and reading screenshots:
   (this caused several mistaps while investigating a bug in this session, before switching to
   reading exact bounds from the view hierarchy — see the recipe below).
 
+## An even faster tier: plain JVM unit tests, no emulator at all
+
+The LaTeX-dump recipe below still needs a running emulator, `adb`, and (for navigation bugs) manual
+counting of how many ◀/▶ presses it takes to reach a specific cursor state. But
+`ExpressionEditor` and everything it delegates to (`CursorNav`, `CursorDelete`, the `*Inserter`
+classes, all the `model/` classes) is **plain Java with no Android dependency** — no `View`, no
+`Paint`, no `Context`. That means the exact same button-press sequences can be replayed directly
+in a JUnit test running on the JVM, asserting straight against `editor.getRootSequence()
+.toLatexString()` and `editor.getCursorPointer()` (a `CursorPointer(node, position)` — just compare
+`.node` and `.position` directly, no rendering or screen involved).
+
+See `app/src/test/java/com/calctastic/sample/hypercal/engine/CursorRegressionTest.java` (power
+family), `FractionRegressionTest.java` (plain "a/b", mixed "a b/c", and one level of fraction/power
+nesting in both directions), and `ComplexNestingRegressionTest.java` (three-four levels deep —
+fraction raised to a fraction, power-of-power-of-fraction inside a fraction's denominator, a
+variable-like symbol squared over another variable-like symbol, power-of-a-power, and deleting one
+level out of a deep nest without disturbing the rest) — they replay button sequences from
+`btn_x_power_y.md`/`btn_fraction.md`'s bug writeups (operand-lift-as-base, nested-power leftover
+placeholder, whole-node delete, delete-before-wrapper, cursor-after-delete-near-operator) as
+`@Test` methods. Run with:
+
+```bash
+./gradlew testDebugUnitTest --tests "com.calctastic.sample.hypercal.engine.*RegressionTest"
+```
+
+Sub-second, no adb, no emulator, no screenshot. When investigating a new cursor/insert/delete bug,
+write the reproduction as one of these tests FIRST (it's usually 5–10 lines calling
+`editor.appendDigit()`/`insertPower()`/`moveCursorLeft()`/`deleteChar()` etc.), confirm it fails,
+fix the code, confirm it passes, then add it permanently to the suite so the bug can't silently
+come back. Reach for the emulator/LaTeX-dump recipe below only once a test proves the model-level
+logic is right and something is still visibly wrong — i.e. a rendering-layer question, which no
+JVM test here can answer (see "When this is NOT enough" below).
+
+**A real bug this surfaced, not just a testing convenience:** the first version of this test suite
+failed in a way the emulator never showed. `NumberNode` keeps its own internal `cursorPosition`
+field (used by `insertChar`/`deleteChar`), separate from the `CursorPointer` wrapper that
+`CursorNav.moveLeft`/`moveRight` return. The two were only ever kept in sync as a side effect of
+`HyperCalDisplayView.setCursorPointer()` running on every redraw — which happens to always occur
+between two button presses in the real app, but doesn't exist at all in a headless JVM test. Fixed
+by moving that sync into `ExpressionEditor`'s own private `setCursor()`, so every cursor change is
+consistent regardless of whether a View is involved — a latent fragility in the "no Android
+dependency" claim that this testing approach caught for free.
+
 ## Recipe
 
 ```bash
